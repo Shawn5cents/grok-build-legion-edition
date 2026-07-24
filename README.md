@@ -2,9 +2,11 @@
   <a href="./README.md"><strong>English</strong></a> · <a href="./HETEROGENEOUS_AGENTS.md"><strong>Architecture Specs</strong></a>
 </p>
 
-<p align="center">
-  <img src="docs/assets/banner.svg" width="100%" alt="Grok Build Legion Edition Header Banner">
-</p>
+<div align="center">
+
+![Grok Build Legion Edition Header Banner](./docs/assets/banner.svg)
+
+</div>
 
 <div align="center">
 
@@ -133,9 +135,11 @@ legion-hub
 
 ---
 
-<p align="center">
-  <img src="docs/assets/footer.svg" width="100%" alt="Grok Build Legion Edition Footer Banner">
-</p>
+<div align="center">
+
+![Grok Build Legion Edition Footer Banner](./docs/assets/footer.svg)
+
+</div>
 
 ## 📄 License
 
