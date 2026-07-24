@@ -77,7 +77,35 @@ legion
 
 ## 🕸️ Heterogeneous Multi-Agent DAG
 
-Legion composes specialized models into a stable Directed Acyclic Graph (DAG):
+Legion composes specialized models into a stable Directed Acyclic Graph (DAG) with provider protocol translation via `CLIProxyAPI`:
+
+```mermaid
+graph TD
+    User["User Request"] --> GrokShell["Legion Grok Shell / TUI<br/>(Clean Upstream Engine)"]
+
+    subgraph DAG ["Heterogeneous Multi-Agent DAG Architecture"]
+        GrokShell --> Orchestrator["Orchestrator Role<br/>(Cline Pass / DeepSeek V4 Pro)"]
+        GrokShell --> Explore["Explore Role<br/>(Kimi K3 / DeepSeek V4 Flash)"]
+        GrokShell --> Plan["Plan Role<br/>(Cline Pass / Kimi Code / DeepSeek R1)"]
+        GrokShell --> General["General-Purpose / Coder Role<br/>(Codex / MiniMax-M3)"]
+        GrokShell --> Verifier["Verifier / Critic Role<br/>(Grok 4.5 / Kimi Code - Read Only)"]
+    end
+
+    DAG -->|OpenAI /v1 API| CLIProxyAPI["CLIProxyAPI Go Server<br/>(localhost:8317)"]
+
+    subgraph ProviderSuite ["CLIProxyAPI Gateway Providers"]
+        CLIProxyAPI --> ClinePass["Cline Pass API (cline.bot)"]
+        CLIProxyAPI --> Codex["Codex Provider (gpt-5-codex)"]
+        CLIProxyAPI --> KimiCode["Kimi Code Provider (kimi-k3 / kimi-k2.7)"]
+        CLIProxyAPI --> OpenCode["OpenCode Provider"]
+        CLIProxyAPI --> OpenRouter["OpenRouter Gateway"]
+        CLIProxyAPI --> ZenMux["ZenMux Gateway"]
+        CLIProxyAPI --> KiloCode["Kilo Code Gateway"]
+        CLIProxyAPI --> NativeAPIs["DeepSeek / MiniMax / xAI / Gemini"]
+    end
+```
+
+### Runtime Task Routing Flow
 
 ```text
                          +-----------------------+
