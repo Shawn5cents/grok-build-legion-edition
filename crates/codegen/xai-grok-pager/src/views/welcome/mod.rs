@@ -451,7 +451,7 @@ pub(super) fn render_version_badge(
                 Style::default().fg(theme.gray),
             ));
             spans.push(Span::styled(
-                " Beta",
+                " Beta Legion Edition",
                 Style::default()
                     .fg(theme.text_primary)
                     .add_modifier(Modifier::BOLD),
@@ -459,7 +459,7 @@ pub(super) fn render_version_badge(
         }
         VersionBadgeMode::HeroFooter => {
             let channel_display = if channel.is_empty() {
-                "Beta"
+                "Beta Legion Edition"
             } else {
                 channel.trim()
             };
@@ -470,7 +470,7 @@ pub(super) fn render_version_badge(
         }
         VersionBadgeMode::HeroInline => {
             spans.push(Span::styled(
-                "Grok Build Beta  ",
+                "Grok Build Beta Legion Edition  ",
                 Style::default()
                     .fg(theme.text_primary)
                     .add_modifier(Modifier::BOLD),
