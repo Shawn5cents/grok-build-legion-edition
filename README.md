@@ -2,11 +2,9 @@
   <a href="./README.md"><strong>English</strong></a> · <a href="./HETEROGENEOUS_AGENTS.md"><strong>Architecture Specs</strong></a>
 </p>
 
-<div align="center">
-
-![Grok Build Legion Edition Header Banner](./docs/assets/banner.svg)
-
-</div>
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=230&section=header&text=GROK%20BUILD%20LEGION%20EDITION&fontSize=50&fontAlignY=38&desc=Universal%20Heterogeneous%20Multi-Agent%20DAG%20%7C%20100%25%20Provider%20%26%20Model%20Agnostic&descFontSize=18&descAlignY=62" width="100%" alt="Grok Build Legion Edition Header Banner">
+</p>
 
 <div align="center">
 
@@ -135,11 +133,9 @@ legion-hub
 
 ---
 
-<div align="center">
-
-![Grok Build Legion Edition Footer Banner](./docs/assets/footer.svg)
-
-</div>
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=100&section=footer" width="100%" alt="Grok Build Legion Edition Footer Banner">
+</p>
 
 ## 📄 License
 
