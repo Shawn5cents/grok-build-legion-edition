@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/banner.svg" width="100%" alt="Grok Build Legion Edition Header Banner">
+  <img src="https://raw.githubusercontent.com/Shawn5cents/grok-build-legion-edition/main/docs/assets/banner.svg" width="100%" alt="Grok Build Legion Edition Header Banner">
 </p>
 
 <div align="center">
@@ -57,16 +57,16 @@ Legion allows assigning **ANY model** to **ANY specialized role** in a Directed 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'lineColor': '#8A2BE2', 'primaryColor': '#1E1E2E', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#74C7EC', 'nodeBorder': '#74C7EC'}}}%%
 graph TD
-    User["👤 User Request"] --> Router["🧠 Router / Lead<br/><code>Any Model (e.g. DeepSeek V4 Pro)</code>"]
+    User["👤 User Request"] --> Router["🧠 Router / Lead"]
 
     subgraph DAG ["🕸️ Heterogeneous Specialist Graph"]
-        Router -->|Complex Task| Explorer["🔍 Explorer<br/><code>Any Model (e.g. Flash / Local Ollama)</code>"]
-        Router -->|Complex Task| Plan["📐 Architecture Planner<br/><code>Any Model (e.g. DeepSeek V4 Pro / Grok 4.5)</code>"]
+        Router -->|Complex Task| Explorer["🔍 Explorer"]
+        Router -->|Complex Task| Plan["📐 Architecture Planner"]
         
-        Explorer --> Implementer["💻 Implementer / Coder<br/><code>Any Model (e.g. MiniMax-M3 / Codex)</code>"]
+        Explorer --> Implementer["💻 Implementer / Coder"]
         Plan --> Implementer
         
-        Implementer --> Verifier["🛡️ Verifier Critic<br/><code>Any Model (e.g. Grok 4.5 / Gemini)</code>"]
+        Implementer --> Verifier["🛡️ Verifier Critic"]
         
         Verifier -->|PASS| Final["✅ Final Task Completion"]
         Verifier -->|FAIL| Repair["↺ 1 Bounded Repair Loop"]
@@ -134,7 +134,7 @@ legion-hub
 ---
 
 <p align="center">
-  <img src="docs/assets/footer.svg" width="100%" alt="Grok Build Legion Edition Footer Banner">
+  <img src="https://raw.githubusercontent.com/Shawn5cents/grok-build-legion-edition/main/docs/assets/footer.svg" width="100%" alt="Grok Build Legion Edition Footer Banner">
 </p>
 
 ## 📄 License
