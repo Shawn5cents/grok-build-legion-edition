@@ -75,22 +75,45 @@ legion
 
 ## 🕸️ Heterogeneous Multi-Agent DAG
 
-Legion composes specialized models into a stable Directed Acyclic Graph (DAG) with provider protocol translation via `CLIProxyAPI`:
+Legion composes specialized models into a stable Directed Acyclic Graph (DAG):
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'lineColor': '#8A2BE2', 'primaryColor': '#1E1E2E', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#74C7EC', 'nodeBorder': '#74C7EC'}}}%%
 graph TD
-    User["👤 User Request"] --> GrokShell["⚡ Legion Core Engine / TUI"]
+    User["👤 User Request"] --> Router["🧠 Router / Lead<br/><code>deepseek-v4-pro</code>"]
 
-    subgraph DAG ["🕸️ Heterogeneous Multi-Agent DAG Architecture"]
-        GrokShell --> Orchestrator["🧠 Orchestrator Role<br/><code>cline-pass</code> / <code>deepseek-v4-pro</code>"]
-        GrokShell --> Explore["🔍 Explore Role<br/><code>kimi-code-k3</code> / <code>deepseek-v4-flash</code>"]
-        GrokShell --> Plan["📐 Plan Role<br/><code>cline-pass</code> / <code>deepseek-r1</code>"]
-        GrokShell --> General["💻 Coder / Implementer Role<br/><code>codex-latest</code> / <code>MiniMax-M3</code>"]
-        GrokShell --> Verifier["🛡️ Verifier Critic Role<br/><code>grok-4.5</code> (Read-Only)"]
+    subgraph DAG ["🕸️ Heterogeneous Specialist Graph"]
+        Router -->|Complex Task| Explorer["🔍 Explorer<br/><code>deepseek-v4-flash</code>"]
+        Router -->|Complex Task| Plan["📐 Architecture Planner<br/><code>deepseek-v4-pro</code>"]
+        
+        Explorer --> Implementer["💻 Implementer / Coder<br/><code>MiniMax-M3</code>"]
+        Plan --> Implementer
+        
+        Implementer --> Verifier["🛡️ Verifier Critic<br/><code>grok-4.5</code> (Read-Only)"]
+        
+        Verifier -->|PASS| Final["✅ Final Task Completion"]
+        Verifier -->|FAIL| Repair["↺ 1 Bounded Repair Loop"]
+        Repair --> Implementer
     end
 
-    DAG -->|OpenAI /v1 API| CLIProxyAPI["🚀 CLIProxyAPI Go Server<br/><code>localhost:8317</code>"]
+    Router -->|Trivial Task| Implementer
+
+    style User fill:#10002B,stroke:#7B2CBF,stroke-width:2px,color:#fff
+    style Router fill:#3C096C,stroke:#C77DFF,stroke-width:3px,color:#fff
+    style Explorer fill:#240046,stroke:#9D4EDD,stroke-width:2px,color:#fff
+    style Plan fill:#240046,stroke:#9D4EDD,stroke-width:2px,color:#fff
+    style Implementer fill:#3C096C,stroke:#E0AAFF,stroke-width:3px,color:#fff
+    style Verifier fill:#5A189A,stroke:#FF85A1,stroke-width:3px,color:#fff
+    style Final fill:#003566,stroke:#00B4D8,stroke-width:2px,color:#fff
+    style Repair fill:#5c001e,stroke:#ff4d4f,stroke-width:2px,color:#fff
+```
+
+### Gateway Provider Protocol Routing
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'lineColor': '#00B4D8', 'primaryColor': '#1E1E2E'}}}%%
+graph LR
+    Subagents["🕸️ Subagent Specialists"] -->|OpenAI /v1 API| CLIProxyAPI["🚀 CLIProxyAPI Go Server<br/><code>localhost:8317</code>"]
 
     subgraph ProviderSuite ["🌐 CLIProxyAPI Provider Suite"]
         CLIProxyAPI --> ClinePass["✨ Cline Pass API (cline.bot)"]
@@ -103,50 +126,10 @@ graph TD
         CLIProxyAPI --> NativeAPIs["🔥 DeepSeek / MiniMax / xAI / Gemini"]
     end
 
-    style GrokShell fill:#2E0854,stroke:#9D4EDD,stroke-width:3px,color:#fff
     style CLIProxyAPI fill:#003566,stroke:#00B4D8,stroke-width:3px,color:#fff
-    style Orchestrator fill:#3C096C,stroke:#C77DFF,stroke-width:2px,color:#fff
-    style Explore fill:#10002B,stroke:#7B2CBF,stroke-width:2px,color:#fff
-    style Plan fill:#240046,stroke:#9D4EDD,stroke-width:2px,color:#fff
-    style General fill:#3C096C,stroke:#E0AAFF,stroke-width:2px,color:#fff
-    style Verifier fill:#5A189A,stroke:#FF85A1,stroke-width:2px,color:#fff
     style ClinePass fill:#001219,stroke:#0A9396,stroke-width:2px,color:#fff
     style Codex fill:#001219,stroke:#94D2BD,stroke-width:2px,color:#fff
     style KimiCode fill:#001219,stroke:#E9D8A6,stroke-width:2px,color:#fff
-    style OpenRouter fill:#001219,stroke:#EE9B00,stroke-width:2px,color:#fff
-```
-
-### Runtime Task Routing Flow
-
-```text
-                         +-----------------------+
-                         | DeepSeek V4 Pro       |
-                         | router / lead         |
-                         +-----------+-----------+
-                                     |
-                       complex task  |  trivial task -> one specialist
-                          +----------+----------+
-                          |                     |
-                 +--------v--------+   +--------v--------+
-                 | V4 Flash        |   | V4 Pro          |
-                 | explore         |   | plan            |
-                 +--------+--------+   +--------+--------+
-                          +----------+----------+
-                                     |
-                           +---------v----------+
-                           | MiniMax-M3         |
-                           | general-purpose    |
-                           | implementation     |
-                           +---------+----------+
-                                     |
-                           +---------v----------+
-                           | grok-4.5           |
-                           | verifier (no edit) |
-                           | fallback: V4 Pro   |
-                           +---------+----------+
-                                     |
-                               PASS --+--> final
-                               FAIL --+--> one repair, one recheck
 ```
 
 ---
