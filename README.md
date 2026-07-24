@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=230&section=header&text=⚔️%20GROK%20BUILD%20LEGION%20EDITION&fontSize=52&fontAlignY=38&desc=Universal%20Heterogeneous%20Multi-Agent%20DAG%20%7C%20100%25%20Provider%20%26%20Model%20Agnostic&descFontSize=18&descAlignY=62&animation=fadeIn" width="100%" alt="Grok Build Legion Edition Header Banner">
+  <img src="docs/assets/banner.svg" width="100%" alt="Grok Build Legion Edition Header Banner">
 </p>
 
 <div align="center">
@@ -134,7 +134,7 @@ legion-hub
 ---
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=100&section=footer" width="100%" alt="Grok Build Legion Edition Footer Banner">
+  <img src="docs/assets/footer.svg" width="100%" alt="Grok Build Legion Edition Footer Banner">
 </p>
 
 ## 📄 License
