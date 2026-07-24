@@ -37,7 +37,6 @@ MODEL_CATALOG = {
     "DeepSeek": [
         {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "ctx": "1,000,000", "desc": "Frontier reasoning & DAG lead"},
         {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "ctx": "1,000,000", "desc": "Ultra-fast codebase exploration"},
-        {"id": "deepseek-reasoner", "name": "DeepSeek R1 Reasoner", "ctx": "128,000", "desc": "Deep chain-of-thought planner"},
     ],
     "xAI / Grok": [
         {"id": "grok-4.5", "name": "Grok 4.5", "ctx": "500,000", "desc": "Frontier verifier critic & standard engine"},

@@ -21,7 +21,6 @@ AVAILABLE_MODELS = [
     {"id": "grok-4.5", "name": "Grok 4.5 (xAI)", "desc": "Frontier reasoning & verification"},
     {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "desc": "1M context frontier reasoning & lead"},
     {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "desc": "1M context ultra-fast exploration"},
-    {"id": "deepseek-reasoner", "name": "DeepSeek R1 Reasoner", "desc": "Chain-of-thought architecture planner"},
     {"id": "MiniMax-M3", "name": "MiniMax-M3", "desc": "1M context implementation & coding specialist"},
     {"id": "cline-pass", "name": "Cline Pass Default", "desc": "Cline Pass subscription gateway model"},
     {"id": "codex-latest", "name": "Codex Latest (gpt-5-codex)", "desc": "OpenAI Codex / Copilot interface"},

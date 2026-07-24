@@ -43,7 +43,6 @@ KEY_MAP = {
         "models": [
             {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "url": "https://api.deepseek.com/v1", "ctx": 1000000},
             {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "url": "https://api.deepseek.com/v1", "ctx": 1000000},
-            {"id": "deepseek-reasoner", "name": "DeepSeek R1 Reasoner", "url": "https://api.deepseek.com/v1", "ctx": 128000},
         ]
     },
     "CODEX_API_KEY": {
@@ -190,7 +189,7 @@ def main():
         orchestrator_model = "deepseek-v4-pro"
         planner_model = "deepseek-v4-pro"
         explore_model = "deepseek-v4-flash"
-        coder_model = "deepseek-reasoner"
+        coder_model = "deepseek-v4-pro"
     elif "OPENROUTER_API_KEY" in discovered_keys:
         orchestrator_model = "anthropic/claude-3.5-sonnet"
         planner_model = "anthropic/claude-3.5-sonnet"
