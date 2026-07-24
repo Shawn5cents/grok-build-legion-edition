@@ -1,0 +1,23 @@
+#!/bin/bash
+# Legion Fork Launcher Script
+# Auto-detects installed tools and API keys on first run
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PRESETS_DIR="$HOME/.grok/config-presets"
+AUTO_PRESET="$PRESETS_DIR/auto-discovered.toml"
+
+# Run Auto-Discovery on first run if auto-discovered.toml is missing
+if [ ! -f "$AUTO_PRESET" ]; then
+    echo "========================================================"
+    echo "🚀 First Run Detected on Legion Fork!"
+    echo "Running Zero-Touch Provider & Model Auto-Discovery..."
+    echo "========================================================"
+    python3 "$SCRIPT_DIR/tools/auto-discover.py"
+    "$SCRIPT_DIR/tools/switch-subagents.sh" auto-discovered
+    echo ""
+fi
+
+# Pass through to grok-pager-bin binary
+exec "$SCRIPT_DIR/target/release/xai-grok-pager-bin" "$@"
