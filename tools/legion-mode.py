@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Interactive Mode Selector for Legion Grok
+Interactive Mode Selector & Preset Creator for Legion Grok
 
-Allows users to switch modes effortlessly via an interactive terminal menu or simple numeric selection.
+Allows users to switch modes effortlessly via an interactive terminal menu,
+or easily create custom DAG preset profiles with zero hassle.
 """
 
 import os
@@ -14,7 +15,6 @@ HOME = Path.home()
 CONFIG = HOME / ".grok" / "config.toml"
 PRESETS_DIR = HOME / ".grok" / "config-presets"
 
-# Resolve switch-subagents.sh location
 possible_switch_locations = [
     Path(__file__).resolve().parent / "switch-subagents.sh",
     HOME / "Desktop" / "grok-build-legion-edition" / "grok-build-legion-edition-main" / "tools" / "switch-subagents.sh",
@@ -59,6 +59,52 @@ MODES = [
     }
 ]
 
+def switch_mode(preset):
+    if not SWITCH_SCRIPT:
+        print("Error: switch-subagents.sh tool not found.")
+        sys.exit(1)
+    subprocess.run([str(SWITCH_SCRIPT), preset], check=True)
+
+def create_custom_preset():
+    print("\n" + "=" * 65)
+    print("🎨 Create Custom Subagent DAG Preset")
+    print("=" * 65)
+    print("Specify your preferred model ID for each role (press Enter to accept default):\n")
+
+    try:
+        preset_name = input("Preset Name [e.g., my-custom-dag]: ").strip().lower().replace(" ", "-")
+        if not preset_name:
+            preset_name = "custom"
+        
+        orchestrator = input("Orchestrator Model [default: deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
+        explore      = input("Explore Model      [default: deepseek-v4-flash]: ").strip() or "deepseek-v4-flash"
+        plan         = input("Plan Model         [default: deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
+        coder        = input("Coder Model        [default: MiniMax-M3]: ").strip() or "MiniMax-M3"
+        verifier     = input("Verifier Model     [default: grok-4.5]: ").strip() or "grok-4.5"
+    except (KeyboardInterrupt, EOFError):
+        print("\nCancelled.")
+        sys.exit(0)
+
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    custom_file = PRESETS_DIR / f"{preset_name}.toml"
+
+    content = f"""# Custom Preset: {preset_name}
+[subagents.models]
+orchestrator    = "{orchestrator}"
+explore         = "{explore}"
+plan            = "{plan}"
+general-purpose = "{coder}"
+verifier        = "{verifier}"
+
+[subagents.fallback]
+verifier = "{orchestrator}"
+"""
+    with open(custom_file, "w") as f:
+        f.write(content)
+
+    print(f"\n✅ Custom preset created at: {custom_file}")
+    switch_mode(preset_name)
+
 def show_menu():
     print("\n" + "=" * 65)
     print("⚔️  Legion Grok Mode Selector")
@@ -69,19 +115,31 @@ def show_menu():
         print(f"  [{mode['key']}] {mode['title']}")
         print(f"      ↳ {mode['desc']}\n")
 
+    # List any user custom presets in ~/.grok/config-presets/
+    custom_presets = []
+    if PRESETS_DIR.exists():
+        builtins = {m["preset"] for m in MODES}
+        for f in sorted(PRESETS_DIR.glob("*.toml")):
+            if f.stem not in builtins and f.stem != "auto-discovered":
+                custom_presets.append(f.stem)
+
+    if custom_presets:
+        print("  🎨 Custom Presets:")
+        for cp in custom_presets:
+            print(f"      • {cp} (run 'legion-mode {cp}')")
+        print("")
+
+    print("  [c] Create a New Custom Preset")
     print("  [0] Run Zero-Touch Auto-Discovery Scan")
     print("  [q] Quit\n")
-
-def switch_mode(preset):
-    if not SWITCH_SCRIPT:
-        print("Error: switch-subagents.sh tool not found.")
-        sys.exit(1)
-    subprocess.run([str(SWITCH_SCRIPT), preset], check=True)
 
 def main():
     if len(sys.argv) > 1:
         choice = sys.argv[1].lower()
-        if choice in ["original", "grok", "default", "1"]:
+        if choice in ["create", "new", "c"]:
+            create_custom_preset()
+            sys.exit(0)
+        elif choice in ["original", "grok", "default", "1"]:
             target_preset = "grok-unified"
         elif choice in ["legion", "dag", "2"]:
             target_preset = "legion-dag"
@@ -99,7 +157,7 @@ def main():
 
     show_menu()
     try:
-        user_input = input("Enter selection [1-5, 0, or q]: ").strip().lower()
+        user_input = input("Enter selection [1-5, c, 0, or q]: ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
         sys.exit(0)
@@ -107,6 +165,8 @@ def main():
     if user_input == "q" or user_input == "":
         print("No changes made.")
         sys.exit(0)
+    elif user_input == "c":
+        create_custom_preset()
     elif user_input == "0":
         print("\nRunning Zero-Touch Auto-Discovery...")
         if AUTO_SCRIPT.exists():
@@ -118,7 +178,12 @@ def main():
             print(f"\nActivating {selected_mode['title']}...")
             switch_mode(selected_mode["preset"])
         else:
-            print("Invalid choice. No changes made.")
+            # Check if user entered a custom preset name
+            custom_path = PRESETS_DIR / f"{user_input}.toml"
+            if custom_path.exists():
+                switch_mode(user_input)
+            else:
+                print("Invalid choice. No changes made.")
 
 if __name__ == "__main__":
     main()
