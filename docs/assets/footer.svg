@@ -1,48 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg
-        width="854"
-        height="100"
-        xmlns="http://www.w3.org/2000/svg"
-        xmlns:xlink="http://www.w3.org/1999/xlink"
-        style="z-index:1;position:relative"
-        viewBox="0 0 854 100"
-      >
-        <style>
-      .text {   font-size: 70px;   font-weight: 700;   font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji;  } .desc {   font-size: 20px;   font-weight: 500;   font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji;  } path {   transform: rotate(180deg);   transform-origin: 50% 50%;  } 
-      .text, .desc {   animation: fadeIn 1.2s ease-in-out forwards;  } @keyframes fadeIn {   from {     opacity: 0;   }   to {     opacity: 1;   }  } 
-    </style>
-        <defs>
-              <linearGradient id="linear" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#833ab4"/><stop offset="50%" stop-color="#fd1d1d"/><stop offset="100%" stop-color="#fcb045"/>
-              </linearGradient>
-            </defs>
-        
-      <g transform="translate(427, 50) scale(1, 1) translate(-427, -50)">
-        <path d="" fill="url(#linear)" opacity="0.4" >
-          <animate
-              attributeName="d"
-              dur="20s"
-              repeatCount="indefinite"
-              keyTimes="0;0.333;0.667;1"
-              calcmod="spline"
-              keySplines="0.2 0 0.2 1;0.2 0 0.2 1;0.2 0 0.2 1"
-              begin="0s"
-              values="M0 0L 0 20Q 213.5 60 427 30T 854 55L 854 0 Z;M0 0L 0 45Q 213.5 60 427 40T 854 30L 854 0 Z;M0 0L 0 65Q 213.5 35 427 65T 854 30L 854 0 Z;M0 0L 0 20Q 213.5 60 427 30T 854 55L 854 0 Z">
-          </animate>
-        </path>
-        <path d="" fill="url(#linear)" opacity="0.4" >
-          <animate
-            attributeName="d"
-            dur="20s"
-            repeatCount="indefinite"
-            keyTimes="0;0.333;0.667;1"
-            calcmod="spline"
-            keySplines="0.2 0 0.2 1;0.2 0 0.2 1;0.2 0 0.2 1"
-            begin="-10s"
-            values="M0 0L 0 35Q 213.5 80 427 50T 854 60L 854 0 Z;M0 0L 0 50Q 213.5 20 427 20T 854 40L 854 0 Z;M0 0L 0 45Q 213.5 25 427 50T 854 65L 854 0 Z;M0 0L 0 35Q 213.5 80 427 50T 854 60L 854 0 Z">
-          </animate>
-        </path>
-      </g>
-         
-        
-      </svg>
+<svg width="854" height="100" viewBox="0 0 854 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="50%" stop-color="#161b22"/>
+      <stop offset="100%" stop-color="#1a1040"/>
+    </linearGradient>
+    <linearGradient id="waveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7B2CBF" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#9D4EDD" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#C77DFF" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="waveGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3C096C" stop-opacity="0.5"/>
+      <stop offset="50%" stop-color="#5A189A" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#7B2CBF" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+  <rect width="854" height="100" fill="url(#bgGrad)"/>
+  <path d="M0 10 Q100 30 214 15 T427 25 T640 10 T854 20 L854 0 L0 0 Z" fill="url(#waveGrad1)"/>
+  <path d="M0 5 Q120 25 250 10 T500 15 T750 5 T854 15 L854 0 L0 0 Z" fill="url(#waveGrad2)"/>
+</svg>
