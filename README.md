@@ -3,93 +3,70 @@
 </p>
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=230&section=header&text=⚔️%20LEGION%20EDITION&fontSize=65&fontAlignY=38&desc=Zero-Touch%20Heterogeneous%20Multi-Agent%20DAG%20%7C%20CLIProxyAPI%20Gateway&descFontSize=20&descAlignY=62&animation=fadeIn" width="100%" alt="Legion Edition Header Banner">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=230&section=header&text=⚔️%20GROK%20BUILD%20LEGION%20EDITION&fontSize=52&fontAlignY=38&desc=Universal%20Heterogeneous%20Multi-Agent%20DAG%20%7C%20100%25%20Provider%20%26%20Model%20Agnostic&descFontSize=18&descAlignY=62&animation=fadeIn" width="100%" alt="Grok Build Legion Edition Header Banner">
 </p>
 
 <div align="center">
 
-[![Creator](https://img.shields.io/badge/Creator-shawn5cents%20%2F%20Nichols%20AI-7B2CBF?style=for-the-badge&logo=github&logoColor=white)](https://github.com/shawn5cents)
-[![Gateway](https://img.shields.io/badge/Gateway-CLIProxyAPI-00B4D8?style=for-the-badge&logo=go&logoColor=white)](https://github.com/router-for-me/Cli-Proxy-API)
-[![DAG Architecture](https://img.shields.io/badge/DAG-Heterogeneous%20Multi--Agent-FF007F?style=for-the-badge&logo=diagramsdotnet&logoColor=white)](HETEROGENEOUS_AGENTS.md)
+[![Fork Creator](https://img.shields.io/badge/Creator-shawn5cents%20%2F%20Nichols%20AI-7B2CBF?style=for-the-badge&logo=github&logoColor=white)](https://github.com/shawn5cents)
+[![Gateway Agnostic](https://img.shields.io/badge/Gateway-Universal%20%2F%20Agnostic-00B4D8?style=for-the-badge&logo=go&logoColor=white)](https://github.com/router-for-me/Cli-Proxy-API)
+[![DAG Architecture](https://img.shields.io/badge/DAG-Multi--Agent%20Specialist%20Graph-FF007F?style=for-the-badge&logo=diagramsdotnet&logoColor=white)](HETEROGENEOUS_AGENTS.md)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-CE412B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/License-Apache_2.0-00F5D4?style=for-the-badge&logo=apache&logoColor=black)](LICENSE)
 
 <br>
 
-**Created & Maintained by [shawn5cents](https://github.com/shawn5cents) (Nichols AI)**
-*A production-grade Heterogeneous Multi-Agent DAG & Zero-Touch Provider Auto-Discovery fork built on SpaceXAI's Grok Build engine.*
+**Created & Maintained by [shawn5cents](https://github.com/shawn5cents) (Nichols AI)**  
+*Upstream Fork of xAI Grok Build with Universal Heterogeneous Subagent Routing.*
 
-[⚡ First-Use Path](#-quick-start--first-use-path) •
-[🕸️ DAG Architecture](#-heterogeneous-multi-agent-dag) •
-[🔍 Auto-Discovery](#-zero-touch-auto-discovery-engine) •
-[🌐 Providers & Gateway](#-unified-provider-gateway) •
+[🚀 Quick Start](#-quick-start) •
+[🌐 Universal & Agnostic Architecture](#-universal--provider-agnostic) •
+[🕸️ Multi-Agent DAG](#-heterogeneous-multi-agent-dag) •
+[🎛️ Interactive Hub & Switcher](#-interactive-hub--configuration-tools) •
 [🤝 Credits](#-credits--acknowledgements) •
-[📄 License](#-license)
+[📄 License](LICENSE)
 
 </div>
 
 ---
 
-## 💡 Why Legion Edition?
+## 💡 Overview
 
-Most AI coding assistants run as a single monolithic model or uncoordinated agent loops, leading to high token entropy, routing regret, and unverified code outputs.
+**Grok Build Legion Edition** is a **100% Model-, CLI-, Provider-, and Gateway-Agnostic** terminal coding agent system. Built on xAI's high-performance Rust engine, Legion unlocks the ability to use **ANY model**, **ANY local or cloud provider**, **ANY gateway proxy**, and **ANY CLI tool** for each specialized subagent role (`orchestrator`, `explore`, `plan`, `general-purpose` coder, `verifier` critic).
 
-**Legion Edition**, created by **shawn5cents (Nichols AI)**, applies the design principles from *Agentic AI System Is a Foreseeable Pathway to AGI*:
-
-- 🧠 **Heterogeneous Specialists**: Route exploration, architecture planning, code generation, and verification to models best suited for each task (`deepseek-v4-pro`, `deepseek-v4-flash`, `MiniMax-M3`, `grok-4.5`, `codex-latest`, `cline-pass`, `kimi-code-k3`).
-- 🛡️ **Contractive Verification Edges**: Enforce an independent read-only critic (`verifier`) right before consequential code edits or task finalization.
-- ⚡ **Zero-Touch Auto-Discovery**: Automatically scan your system's environment API keys, local binaries (`ollama`, `opencode`, `codex`, `cline`), and running HTTP gateways on first run.
-- 💎 **100% Upstream Git Hygiene**: Built with an additive design so `git pull upstream main` and `git rebase` remain completely conflict-free.
+> [!IMPORTANT]
+> **Universal Freedom**: You are NEVER locked into specific models or providers. Whether you use local models (Ollama, LM Studio, vLLM), cloud SaaS providers (OpenAI, DeepSeek, Anthropic, Gemini, Grok, MiniMax, Qwen, Moonshot), universal gateways (CLIProxyAPI, LiteLLM, OpenRouter, ZenMux, Kilo Code, Cline Pass), or direct API endpoints — Legion automatically discovers and works with whatever you have configured!
 
 ---
 
-## 🚀 Quick Start & First-Use Path
+## 🌐 Universal & Provider-Agnostic
 
-### 1. One-Line Installation
+Legion decouples agent roles from specific vendor lock-in:
 
-Clone the repository and run the zero-touch installer:
-
-```bash
-git clone https://github.com/shawn5cents/grok-build-legion-edition.git
-cd grok-build-legion-edition
-./install.sh
-```
-
-`install.sh` automatically:
-1. Cleans up legacy binaries/symlinks in `~/.local/bin/`.
-2. Compiles the optimized release binary.
-3. Runs **Zero-Touch Provider Auto-Discovery**.
-4. Installs executable `legion` and `grok` launchers to `~/.local/bin/`.
-
-### 2. Launch Session
-
-Launch your multi-agent session from any terminal:
-
-```bash
-legion
-```
-
-*(Or use `grok` interchangeably)*.
+- **Bring Any Model**: DeepSeek, OpenAI / Codex, Anthropic / Claude, Google Gemini, xAI Grok, MiniMax, Qwen, Mistral, Moonshot Kimi, Llama 3, CodeLlama, or local Ollama models.
+- **Bring Any Gateway or Proxy**: `CLIProxyAPI`, LiteLLM, OpenRouter, ZenMux, Kilo Code, Cline Pass, vLLM, local HTTP proxies, or direct SaaS API endpoints.
+- **Bring Any CLI Tool**: Automatically detects and leverages `ollama`, `opencode`, `codex`, `cline`, `agy`, `python3`, `go`, and local binaries installed on your system.
+- **100% Upstream Git Hygiene**: Zero core engine modifications required — preserves 100% clean `git pull upstream main` compatibility.
 
 ---
 
 ## 🕸️ Heterogeneous Multi-Agent DAG
 
-Legion composes specialized models into a stable Directed Acyclic Graph (DAG):
+Legion allows assigning **ANY model** to **ANY specialized role** in a Directed Acyclic Graph (DAG):
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'lineColor': '#8A2BE2', 'primaryColor': '#1E1E2E', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#74C7EC', 'nodeBorder': '#74C7EC'}}}%%
 graph TD
-    User["👤 User Request"] --> Router["🧠 Router / Lead<br/><code>deepseek-v4-pro</code>"]
+    User["👤 User Request"] --> Router["🧠 Router / Lead<br/><code>Any Model (e.g. DeepSeek V4 Pro)</code>"]
 
     subgraph DAG ["🕸️ Heterogeneous Specialist Graph"]
-        Router -->|Complex Task| Explorer["🔍 Explorer<br/><code>deepseek-v4-flash</code>"]
-        Router -->|Complex Task| Plan["📐 Architecture Planner<br/><code>deepseek-v4-pro</code>"]
+        Router -->|Complex Task| Explorer["🔍 Explorer<br/><code>Any Model (e.g. Flash / Local Ollama)</code>"]
+        Router -->|Complex Task| Plan["📐 Architecture Planner<br/><code>Any Model (e.g. R1 / Grok 4.5)</code>"]
         
-        Explorer --> Implementer["💻 Implementer / Coder<br/><code>MiniMax-M3</code>"]
+        Explorer --> Implementer["💻 Implementer / Coder<br/><code>Any Model (e.g. MiniMax-M3 / Codex)</code>"]
         Plan --> Implementer
         
-        Implementer --> Verifier["🛡️ Verifier Critic<br/><code>grok-4.5</code> (Read-Only)"]
+        Implementer --> Verifier["🛡️ Verifier Critic<br/><code>Any Model (e.g. Grok 4.5 / Gemini)</code>"]
         
         Verifier -->|PASS| Final["✅ Final Task Completion"]
         Verifier -->|FAIL| Repair["↺ 1 Bounded Repair Loop"]
@@ -108,129 +85,58 @@ graph TD
     style Repair fill:#5c001e,stroke:#ff4d4f,stroke-width:2px,color:#fff
 ```
 
-### Gateway Provider Protocol Routing
+---
 
-```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'lineColor': '#00B4D8', 'primaryColor': '#1E1E2E'}}}%%
-graph LR
-    Subagents["🕸️ Subagent Specialists"] -->|OpenAI /v1 API| CLIProxyAPI["🚀 CLIProxyAPI Go Server<br/><code>localhost:8317</code>"]
+## 🎛️ Interactive Hub & Configuration Tools
 
-    subgraph ProviderSuite ["🌐 CLIProxyAPI Provider Suite"]
-        CLIProxyAPI --> ClinePass["✨ Cline Pass API (cline.bot)"]
-        CLIProxyAPI --> Codex["⚡ Codex Provider (gpt-5-codex)"]
-        CLIProxyAPI --> KimiCode["🌙 Kimi Code Provider (kimi-k3)"]
-        CLIProxyAPI --> OpenCode["📦 OpenCode Provider"]
-        CLIProxyAPI --> OpenRouter["🔀 OpenRouter Gateway"]
-        CLIProxyAPI --> ZenMux["☯️ ZenMux Gateway"]
-        CLIProxyAPI --> KiloCode["⚡ Kilo Code Gateway"]
-        CLIProxyAPI --> NativeAPIs["🔥 DeepSeek / MiniMax / xAI / Gemini"]
-    end
+Legion ships with intuitive interactive tools so you can configure models and presets with zero TOML editing required:
 
-    style CLIProxyAPI fill:#003566,stroke:#00B4D8,stroke-width:3px,color:#fff
-    style ClinePass fill:#001219,stroke:#0A9396,stroke-width:2px,color:#fff
-    style Codex fill:#001219,stroke:#94D2BD,stroke-width:2px,color:#fff
-    style KimiCode fill:#001219,stroke:#E9D8A6,stroke-width:2px,color:#fff
-```
+| Command | Description |
+|---|---|
+| **`legion-hub`** *(or `legion hub`)* | **Ultimate Visual Control Panel**: Browse model catalog by context window, assign models to roles, select presets, view live DAG topology, and launch sessions. |
+| **`legion-mode`** *(or `legion --mode`)* | **Preset Profile Switcher**: Instantly switch between profiles (`Original Grok 4.5`, `Legion DAG`, `Cline/Codex`, `Auto-Discovered`) or run `legion-mode create` to build a custom preset. |
+| **`legion-config`** | **Model & Role Editor**: Interactively change models for individual subagent roles or apply **one single LLM to ALL roles at once** (`legion-config --all <model>`). |
+| **`./tools/auto-discover.py`** | **Zero-Touch Capability Scan**: Automatically scans system API keys, local binaries (`ollama`, `opencode`, `codex`, `cline`, `agy`), and running proxies to generate a tailored profile. |
 
 ---
 
-## 🔍 Zero-Touch Auto-Discovery Engine
+## 🚀 Quick Start
 
-What sets Legion apart is its **Zero-Touch Provider & Model Auto-Discovery Engine** (`tools/auto-discover.py`).
-
-Whenever you start a session or run `./tools/auto-discover.py`, Legion scans your machine and environment:
+### 1. Install Legion
 
 ```bash
-./tools/auto-discover.py
+git clone https://github.com/shawn5cents/grok-build-legion-edition.git
+cd grok-build-legion-edition
+./install.sh
 ```
 
-```text
-⚡ Auto-Discovering Installed Tools, Credentials, and Services...
-=================================================================
-  [✓] Environment API Key: DEEPSEEK_API_KEY
-  [✓] Environment API Key: MINIMAX_API_KEY
-  [✓] Environment API Key: OPENROUTER_API_KEY
-  [✓] Environment API Key: ANTHROPIC_API_KEY
-  [✓] Environment API Key: ZENMUX_API_KEY
-  [✓] Environment API Key: KIMI_API_KEY
-  [✓] Binary Installed: ollama -> /usr/local/bin/ollama
-  [✓] Binary Installed: opencode -> ~/.bun/bin/opencode
-  [✓] Binary Installed: codex -> ~/.npm-global/bin/codex
-  [✓] Binary Installed: cline -> ~/.npm-global/bin/cline
-  [✓] Configuration Directory: ~/.cline
-  [✓] Configuration Directory: ~/.claude
-  [✓] Configuration Directory: ~/.gemini
-  [✓] Desktop Tool Found: CLIProxyAPI at ~/Desktop/CLIProxyAPI-main
-
-🎯 Auto-Configuring Optimal Heterogeneous DAG Mapping:
-  • Orchestrator : deepseek-v4-pro
-  • Explore      : deepseek-v4-flash
-  • Plan         : deepseek-v4-pro
-  • Coder        : MiniMax-M3
-  • Verifier     : grok-4.5
-```
-
----
-
-## 🌐 Unified Provider Gateway
-
-Legion unifies all commercial, cloud, and local providers through the high-performance local **`CLIProxyAPI` Go Server** (`http://localhost:8317/v1`):
-
-| Model ID | Provider Endpoint | Context Window | Best Role |
-| :--- | :--- | ---: | :--- |
-| **`deepseek-v4-pro`** | `https://api.deepseek.com/v1` | 1,000,000 | Orchestrator & Architecture Planner |
-| **`deepseek-v4-flash`** | `https://api.deepseek.com/v1` | 1,000,000 | Codebase Exploration Specialist |
-| **`MiniMax-M3`** | `https://api.minimax.io/v1` | 1,000,000 | General-Purpose Implementation Coder |
-| **`grok-4.5`** | `https://api.x.ai/v1` | 500,000 | Contractive Verifier Critic |
-| **`cline-pass`** | `https://api.cline.bot/v1` | 200,000 | Cline Pass Subscription Gateway |
-| **`codex-latest`** | `gpt-5-codex` | 128,000 | OpenAI Codex / Copilot Interface |
-| **`kimi-code-k3`** | `https://api.moonshot.cn/v1` | 1,000,000 | Moonshot Kimi K3 2.8T Parameter Model |
-| **`openrouter/*`** | `https://openrouter.ai/api/v1` | 200,000+ | Universal SaaS Model Gateway |
-
----
-
-## 🎛️ Live Preset Switcher
-
-List all installed DAG presets:
+### 2. Launch an Interactive Session
 
 ```bash
-./tools/switch-subagents.sh list
+legion
 ```
 
-Switch presets instantly mid-session without restarting:
+### 3. Open the Interactive Control Hub
 
 ```bash
-# Activate auto-discovered system profile
-./tools/switch-subagents.sh auto-discovered
-
-# Heterogeneous DAG Profile (DeepSeek V4 Pro + Flash + MiniMax + Grok 4.5)
-./tools/switch-subagents.sh legion-dag
-
-# Cline Pass + Codex + Kimi Code Profile
-./tools/switch-subagents.sh cline-pass-dag
-
-# Fast Flash Coordinator Profile
-./tools/switch-subagents.sh flash-orchestrator
+legion-hub
 ```
 
 ---
 
 ## 🤝 Credits & Acknowledgements
 
-Legion Edition stands on the shoulders of incredible open-source projects and creators:
-
-- **Fork Creator & Lead Maintainer**: **[shawn5cents](https://github.com/shawn5cents)** (Nichols AI) — Designed the Heterogeneous Multi-Agent DAG Architecture, Zero-Touch Auto-Discovery Engine, live preset switcher, and overall Legion fork integration.
-- **Provider Gateway Engine**: **[CLIProxyAPI](https://github.com/router-for-me/Cli-Proxy-API)** (by router-for-me) — High-performance Go proxy server enabling multi-account and multi-provider protocol routing (OpenCode, OpenRouter, ZenMux, Kilo Code, Cline Pass, Codex, Kimi Code, Gemini, Anthropic, DeepSeek, MiniMax).
+- **Creator & Maintainer**: **[shawn5cents](https://github.com/shawn5cents)** (Nichols AI) — Designed the Universal Heterogeneous Multi-Agent DAG Architecture, Zero-Touch Auto-Discovery Engine, interactive Hub & switcher tools, and overall Legion system.
+- **Provider Gateway Engine**: **[CLIProxyAPI](https://github.com/router-for-me/Cli-Proxy-API)** (by router-for-me) — High-performance Go proxy server enabling multi-account and multi-provider protocol routing.
 - **Core Engine & Agent Runtime**: **SpaceXAI / xAI Team** — Creators of the original `Grok Build` (`grok`) terminal-based AI coding agent codebase.
-- **README Visual Design**: Inspired by the design methodology from **[oil-oil/beautify-github-readme](https://github.com/oil-oil/beautify-github-readme)**.
+- **README Visual Design**: Inspired by **[oil-oil/beautify-github-readme](https://github.com/oil-oil/beautify-github-readme)**.
 
 ---
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=100&section=footer" width="100%" alt="Legion Edition Footer Banner">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=10,18,30,42,55&height=100&section=footer" width="100%" alt="Grok Build Legion Edition Footer Banner">
 </p>
 
 ## 📄 License
 
 First-party code is licensed under the **Apache License, Version 2.0** — see [`LICENSE`](LICENSE).
-Architecture design and heterogeneous graph principles are documented in [`HETEROGENEOUS_AGENTS.md`](HETEROGENEOUS_AGENTS.md).
