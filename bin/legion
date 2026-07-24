@@ -1,12 +1,19 @@
 #!/bin/bash
 # Legion Fork Launcher Script
-# Auto-detects installed tools and API keys on first run
+# Supports --mode / -m flag or interactive mode selection
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PRESETS_DIR="$HOME/.grok/config-presets"
 AUTO_PRESET="$PRESETS_DIR/auto-discovered.toml"
+
+# Check for --mode or -m flag
+if [ "$1" = "--mode" ] || [ "$1" = "-m" ]; then
+    shift
+    python3 "$SCRIPT_DIR/tools/legion-mode.py" "$@"
+    exit 0
+fi
 
 # Run Auto-Discovery on first run if auto-discovered.toml is missing
 if [ ! -f "$AUTO_PRESET" ]; then

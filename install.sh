@@ -13,7 +13,7 @@ cargo build --release -p xai-grok-pager-bin
 mkdir -p ~/.local/bin
 
 # Automatically remove any pre-existing legacy symlinks or binaries
-for name in "legion" "grok"; do
+for name in "legion" "grok" "legion-mode"; do
     target="$HOME/.local/bin/$name"
     if [ -L "$target" ] || [ -f "$target" ]; then
         echo "🧹 Removing legacy $name binary/symlink at $target..."
@@ -26,15 +26,20 @@ echo "⚡ Running Zero-Touch Provider & Model Auto-Discovery..."
 python3 tools/auto-discover.py
 ./tools/switch-subagents.sh auto-discovered
 
-# Install launcher script for both 'legion' and 'grok' commands
+# Install launcher script for 'legion' and 'grok' commands
 cp bin/legion ~/.local/bin/legion
 chmod +x ~/.local/bin/legion
 
 cp bin/legion ~/.local/bin/grok
 chmod +x ~/.local/bin/grok
 
+# Install interactive mode selector tool
+cp tools/legion-mode.py ~/.local/bin/legion-mode
+chmod +x ~/.local/bin/legion-mode
+
 echo ""
 echo "=========================================================="
 echo "✅ Legion Grok Fork successfully installed!"
-echo "   Run 'legion' or 'grok' from anywhere to start your session."
+echo "   • Run 'legion' or 'grok' to start your session."
+echo "   • Run 'legion-mode' or 'legion --mode' to switch modes."
 echo "=========================================================="
