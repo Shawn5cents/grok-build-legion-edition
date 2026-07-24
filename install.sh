@@ -13,13 +13,18 @@ cargo build --release -p xai-grok-pager-bin
 mkdir -p ~/.local/bin
 
 # Automatically remove any pre-existing legacy symlinks or binaries
-for name in "legion" "grok" "legion-hub" "legion-mode" "legion-config"; do
+for name in "legion" "grok" "legion-hub" "legion-mode" "legion-config" "xai-grok-pager" "xai-grok-pager-bin"; do
     target="$HOME/.local/bin/$name"
     if [ -L "$target" ] || [ -f "$target" ]; then
         echo "🧹 Removing legacy $name binary/symlink at $target..."
         rm -f "$target"
     fi
 done
+
+# Copy release binary to ~/.local/bin/xai-grok-pager
+echo "🚚 Installing binary to ~/.local/bin/xai-grok-pager..."
+cp target/release/xai-grok-pager ~/.local/bin/xai-grok-pager
+chmod +x ~/.local/bin/xai-grok-pager
 
 # Run auto-discovery
 echo "⚡ Running Zero-Touch Provider & Model Auto-Discovery..."

@@ -4,21 +4,29 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PRESETS_DIR="$HOME/.grok/config-presets"
+HOME_DIR="$HOME"
+REPO_DIR="$HOME/Desktop/grok-build-legion-edition/grok-build-legion-edition-main"
+PRESETS_DIR="$HOME_DIR/.grok/config-presets"
 AUTO_PRESET="$PRESETS_DIR/auto-discovered.toml"
+
+# Resolve tools directory
+if [ -d "$REPO_DIR/tools" ]; then
+    TOOLS_DIR="$REPO_DIR/tools"
+else
+    TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools"
+fi
 
 # Check for --hub / hub flag
 if [ "$1" = "--hub" ] || [ "$1" = "hub" ]; then
     shift
-    python3 "$SCRIPT_DIR/tools/legion-hub.py" "$@"
+    python3 "$TOOLS_DIR/legion-hub.py" "$@"
     exit 0
 fi
 
 # Check for --mode / -m flag
 if [ "$1" = "--mode" ] || [ "$1" = "-m" ]; then
     shift
-    python3 "$SCRIPT_DIR/tools/legion-mode.py" "$@"
+    python3 "$TOOLS_DIR/legion-mode.py" "$@"
     exit 0
 fi
 
@@ -28,10 +36,20 @@ if [ ! -f "$AUTO_PRESET" ]; then
     echo "🚀 First Run Detected on Legion Fork!"
     echo "Running Zero-Touch Provider & Model Auto-Discovery..."
     echo "========================================================"
-    python3 "$SCRIPT_DIR/tools/auto-discover.py"
-    "$SCRIPT_DIR/tools/switch-subagents.sh" auto-discovered
+    python3 "$TOOLS_DIR/auto-discover.py"
+    "$TOOLS_DIR/switch-subagents.sh" auto-discovered
     echo ""
 fi
 
-# Pass through to grok-pager-bin binary
-exec "$SCRIPT_DIR/target/release/xai-grok-pager-bin" "$@"
+# Locate compiled binary (xai-grok-pager or xai-grok-pager-bin)
+if [ -f "$HOME_DIR/.local/bin/xai-grok-pager" ]; then
+    exec "$HOME_DIR/.local/bin/xai-grok-pager" "$@"
+elif [ -f "$REPO_DIR/target/release/xai-grok-pager" ]; then
+    exec "$REPO_DIR/target/release/xai-grok-pager" "$@"
+elif [ -f "$REPO_DIR/target/release/xai-grok-pager-bin" ]; then
+    exec "$REPO_DIR/target/release/xai-grok-pager-bin" "$@"
+else
+    echo "Building release binary..."
+    cd "$REPO_DIR" && cargo build --release -p xai-grok-pager-bin
+    exec "$REPO_DIR/target/release/xai-grok-pager" "$@"
+fi
