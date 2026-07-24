@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Shawn5cents/grok-build-legion-edition/main/docs/assets/banner.svg" width="100%" alt="Grok Build Legion Edition Header Banner">
+  <img src="docs/assets/banner.svg" width="100%" alt="Grok Build Legion Edition Header Banner">
 </p>
 
 <div align="center">
@@ -134,7 +134,7 @@ legion-hub
 ---
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Shawn5cents/grok-build-legion-edition/main/docs/assets/footer.svg" width="100%" alt="Grok Build Legion Edition Footer Banner">
+  <img src="docs/assets/footer.svg" width="100%" alt="Grok Build Legion Edition Footer Banner">
 </p>
 
 ## 📄 License
