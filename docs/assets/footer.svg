@@ -3,20 +3,20 @@
   <defs>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0d1117"/>
-      <stop offset="100%" stop-color="#151b23"/>
+      <stop offset="100%" stop-color="#161b22"/>
     </linearGradient>
-    <linearGradient id="silverWave1" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#8b949e" stop-opacity="0.15"/>
-      <stop offset="50%" stop-color="#c9d1d9" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#8b949e" stop-opacity="0.15"/>
+    <linearGradient id="redWave1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#b91c1c" stop-opacity="0.25"/>
+      <stop offset="50%" stop-color="#dc2626" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#b91c1c" stop-opacity="0.25"/>
     </linearGradient>
-    <linearGradient id="silverWave2" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#6e7681" stop-opacity="0.12"/>
-      <stop offset="50%" stop-color="#8b949e" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#6e7681" stop-opacity="0.12"/>
+    <linearGradient id="redWave2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7f1d1d" stop-opacity="0.2"/>
+      <stop offset="50%" stop-color="#991b1b" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#7f1d1d" stop-opacity="0.2"/>
     </linearGradient>
   </defs>
   <rect width="854" height="60" fill="url(#bgGrad)"/>
-  <path d="M0 8 Q140 20 280 12 T560 18 T854 10 L854 0 L0 0 Z" fill="url(#silverWave1)"/>
-  <path d="M0 4 Q180 14 360 8 T720 12 T854 6 L854 0 L0 0 Z" fill="url(#silverWave2)"/>
+  <path d="M0 8 Q140 20 280 12 T560 18 T854 10 L854 0 L0 0 Z" fill="url(#redWave1)"/>
+  <path d="M0 4 Q180 14 360 8 T720 12 T854 6 L854 0 L0 0 Z" fill="url(#redWave2)"/>
 </svg>
