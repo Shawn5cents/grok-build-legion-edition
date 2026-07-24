@@ -61,7 +61,7 @@ graph TD
 
     subgraph DAG ["🕸️ Heterogeneous Specialist Graph"]
         Router -->|Complex Task| Explorer["🔍 Explorer<br/><code>Any Model (e.g. Flash / Local Ollama)</code>"]
-        Router -->|Complex Task| Plan["📐 Architecture Planner<br/><code>Any Model (e.g. R1 / Grok 4.5)</code>"]
+        Router -->|Complex Task| Plan["📐 Architecture Planner<br/><code>Any Model (e.g. DeepSeek V4 Pro / Grok 4.5)</code>"]
         
         Explorer --> Implementer["💻 Implementer / Coder<br/><code>Any Model (e.g. MiniMax-M3 / Codex)</code>"]
         Plan --> Implementer
