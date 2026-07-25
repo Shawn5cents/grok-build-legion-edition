@@ -505,6 +505,11 @@ impl AgentView {
         if let Event::Key(key) = ev
             && key.kind == KeyEventKind::Press
         {
+            if key.code == KeyCode::Char('b')
+                && key.modifiers.contains(KeyModifiers::CONTROL)
+            {
+                return InputOutcome::Action(Action::ToggleLegionDagBanner);
+            }
             if key.code == KeyCode::Char('d')
                 && key.modifiers.is_empty()
                 && let Some(t) = self.esc_pressed_at.take()

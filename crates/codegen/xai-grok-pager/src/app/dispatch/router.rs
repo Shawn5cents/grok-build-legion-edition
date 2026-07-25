@@ -163,6 +163,19 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             effects.push(Effect::Quit);
             effects
         }
+        Action::ToggleLegionDagBanner => {
+            app.show_legion_dag_banner = !app.show_legion_dag_banner;
+            let visible = app.show_legion_dag_banner;
+            if let Some(agent) = app.active_agent_mut() {
+                let msg = if visible {
+                    "✓ Legion DAG Visual: VISIBLE (Ctrl+B)"
+                } else {
+                    "✓ Legion DAG Visual: HIDDEN (Ctrl+B)"
+                };
+                agent.show_toast(msg);
+            }
+            vec![]
+        }
         Action::ResumeForeignSession => {
             let Some(hint) = app.take_foreign_resume_hint() else {
                 return vec![];

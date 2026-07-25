@@ -304,6 +304,8 @@ pub struct BannerSlotParams<'a> {
     /// Privacy upsell banner owns the slot (highest banner precedence
     /// below critical announcements; gated by the caller).
     pub(crate) privacy_banner: bool,
+    /// Visual Heterogeneous Multi-Agent DAG banner (Ctrl+B).
+    pub(crate) legion_dag_banner: bool,
     /// Last mouse position, for mouse-pos-driven hover styling.
     pub(crate) mouse_pos: Option<(u16, u16)>,
     /// Session tip, only when it owns the slot.
@@ -318,6 +320,7 @@ impl BannerSlotParams<'static> {
             announcements: &[],
             hidden_ids: &EMPTY_IDS,
             privacy_banner: false,
+            legion_dag_banner: false,
             mouse_pos: None,
             tip: None,
         }

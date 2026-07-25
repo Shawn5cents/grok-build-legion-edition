@@ -664,6 +664,8 @@ pub struct AppView {
     pub tracing_rx: Option<crate::tracing::LogRx>,
     /// Scroll-diagnostics HUD (`GROK_SCROLL_DEBUG` env / `/scroll-debug`).
     /// Release-compiled behind its runtime gate — see the module doc.
+    /// Toggle state for Visual Heterogeneous Multi-Agent DAG banner (Ctrl+B).
+    pub show_legion_dag_banner: bool,
     pub scroll_debug_hud: crate::views::scroll_debug_hud::ScrollDebugHud,
     /// Release-safe FPS HUD (`/debug fps`; `GROK_FPS` env on release
     /// builds, where the dev overlay is compiled out) — see the module doc.
@@ -1388,6 +1390,7 @@ impl AppView {
             pending_notification_escapes: None,
             deferred_notification: None,
             tracing_rx: None,
+            show_legion_dag_banner: true,
             scroll_debug_hud: crate::views::scroll_debug_hud::ScrollDebugHud::new(),
             fps_hud: crate::views::fps_hud::FpsHud::new(),
             active_announcements: Vec::new(),
@@ -1909,6 +1912,12 @@ impl AppView {
     pub fn active_agent(&self) -> Option<&AgentView> {
         match self.active_view {
             ActiveView::Agent(id) => self.agents.get(&id),
+            _ => None,
+        }
+    }
+    pub fn active_agent_mut(&mut self) -> Option<&mut AgentView> {
+        match self.active_view {
+            ActiveView::Agent(id) => self.agents.get_mut(&id),
             _ => None,
         }
     }
@@ -4541,6 +4550,7 @@ impl AppView {
                                     announcements: &self.active_announcements,
                                     hidden_ids: &self.hidden_announcement_ids,
                                     privacy_banner,
+                                    legion_dag_banner: self.show_legion_dag_banner && self.current_ui.permission_mode.as_deref() == Some("legion"),
                                     mouse_pos: agent_mouse_pos,
                                     tip: if show_session_tip {
                                         self.tip.as_deref()
@@ -5728,6 +5738,7 @@ pub(crate) mod tests {
             pending_gate_verification: None,
             gate_verify_gen: 0,
             bundle_state: BundleState::default(),
+            show_legion_dag_banner: true,
             scroll_debug_hud: crate::views::scroll_debug_hud::ScrollDebugHud::new(),
             fps_hud: crate::views::fps_hud::FpsHud::new(),
             welcome_prompt: crate::views::prompt_widget::PromptWidget::new(),

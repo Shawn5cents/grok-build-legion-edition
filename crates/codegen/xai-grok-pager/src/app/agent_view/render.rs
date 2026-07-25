@@ -703,6 +703,7 @@ impl AgentView {
             announcements: banner_announcements,
             hidden_ids: hidden_announcement_ids,
             privacy_banner,
+            legion_dag_banner: _,
             mouse_pos,
             tip,
         } = banner;
@@ -1293,6 +1294,10 @@ impl AgentView {
                 plan_style = plan_style.add_modifier(ratatui::style::Modifier::BOLD);
             }
             status.push("plan", Line::from(Span::styled("plan", plan_style)));
+        }
+        if banner.legion_dag_banner {
+            let legion_style = Style::default().fg(theme.accent_plan).bg(theme.bg_base);
+            status.push("legion_dag", Line::from(Span::styled("⚔️ LEGION DAG [Ctrl+B]", legion_style)));
         }
         if let Some(ref goal) = self.goal_state {
             let tick = self.tasks.tick_count() as usize;
@@ -2079,6 +2084,15 @@ impl AgentView {
             self.privacy_banner
                 .hit_legal
                 .set_unless_dropdown(Some(rects.legal), dropdown_open);
+        } else if banner.legion_dag_banner {
+            let widget = crate::views::legion_dag_banner::LegionDagBanner::new(
+                "deepseek-v4-pro",
+                "deepseek-v4-flash",
+                "nemotron-3-ultra",
+                "MiniMax-M3",
+                "grok-4.5",
+            );
+            ratatui::widgets::Widget::render(widget, layout.banner, buf);
         } else if let Some((ref msg, remaining)) = self.mode_switch_banner {
             self.hit_announcement_hide.clear();
             self.hit_announcement_cta.clear();
