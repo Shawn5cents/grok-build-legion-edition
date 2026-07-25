@@ -691,6 +691,9 @@ pub enum BuiltinAgentName {
     GeneralPurpose,
     Explore,
     Plan,
+    Architect,
+    Implementor,
+    Verifier,
     BrowserUse,
     #[strum(serialize = "grok-build-orchestrator")]
     GrokBuildOrchestrator,
@@ -720,13 +723,23 @@ impl BuiltinAgentName {
             Self::GeneralPurpose => AgentDefinition::general_purpose(),
             Self::Explore => AgentDefinition::explore(),
             Self::Plan => AgentDefinition::plan(),
+            Self::Architect => AgentDefinition::architect(),
+            Self::Implementor => AgentDefinition::implementor(),
+            Self::Verifier => AgentDefinition::verifier(),
             Self::BrowserUse => AgentDefinition::browser_use(),
             Self::GrokBuildOrchestrator => AgentDefinition::grok_build_orchestrator(),
         }
     }
     /// Built-in agents available as subagents via the Task tool.
     pub fn subagent_variants() -> &'static [Self] {
-        &[Self::GeneralPurpose, Self::Explore, Self::Plan]
+        &[
+            Self::GeneralPurpose,
+            Self::Explore,
+            Self::Plan,
+            Self::Architect,
+            Self::Implementor,
+            Self::Verifier,
+        ]
     }
 }
 /// Portable agent identity — parsed from .grok/agents/*.md.
@@ -1583,6 +1596,38 @@ impl AgentDefinition {
             prompt_body: Some(subagent_prompts::PLAN_PROMPT.to_string()),
             inherit_skills: false,
             ..Self::base(BuiltinAgentName::Plan, "")
+        }
+    }
+    /// Architect subagent — alias/extension for plan.
+    pub fn architect() -> Self {
+        use crate::prompt::subagent_prompts;
+        Self {
+            description: "Read-only architectural designer for system blueprints and implementation plans".to_string(),
+            tool_config: plan_toolset(),
+            permission_mode: PermissionMode::Plan,
+            prompt_body: Some(subagent_prompts::PLAN_PROMPT.to_string()),
+            inherit_skills: false,
+            ..Self::base(BuiltinAgentName::Architect, "")
+        }
+    }
+    /// Implementor subagent — full-permission code execution and editing.
+    pub fn implementor() -> Self {
+        Self {
+            description: "Full implementation worker for editing code, applying patches, and running builds".to_string(),
+            tool_config: default_grok_build_toolset(),
+            permission_mode: PermissionMode::DontAsk,
+            inherit_skills: true,
+            ..Self::base(BuiltinAgentName::Implementor, "")
+        }
+    }
+    /// Verifier subagent — read-only contractive evaluator.
+    pub fn verifier() -> Self {
+        Self {
+            description: "Contractive verifier edge for reviewing code and validating changes without modifying files".to_string(),
+            tool_config: explore_toolset(),
+            permission_mode: PermissionMode::Plan,
+            inherit_skills: false,
+            ..Self::base(BuiltinAgentName::Verifier, "")
         }
     }
     /// Browser Use agent definition.
