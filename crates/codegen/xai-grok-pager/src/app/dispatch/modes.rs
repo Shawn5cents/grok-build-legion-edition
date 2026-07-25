@@ -719,14 +719,14 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                     Some("always-approve")
                 }
             }
-            // Always-Approve → Normal
+            // Always-Approve → Legion Multi-Agent DAG
             (false, _, true) => {
                 agent.session.yolo_mode = false;
                 app.default_yolo = false;
-                app.current_ui.permission_mode = Some("ask".into());
-                agent.show_mode_switch_banner("Normal");
-                tracing::info!("Mode cycle (pre-session): Always-Approve → Normal");
-                Some("ask")
+                app.current_ui.permission_mode = Some("legion".into());
+                agent.show_mode_switch_banner("Legion Multi-Agent DAG");
+                tracing::info!("Mode cycle (pre-session): Always-Approve → Legion Multi-Agent DAG");
+                Some("legion")
             }
             // Plan + Auto → Auto (exit plan, keep the classifier), matching the
             // with-session `(true, true, false, …)` arm. Every other plan+weird
@@ -890,17 +890,17 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 persist: crate::app::actions::PermissionModePersist::BestEffort,
             }]
         }
-        // Always-Approve → Normal
+        // Always-Approve → Legion Multi-Agent DAG Mode
         (false, _, true) => {
             set_yolo_mode_inner(app, false);
-            app.current_ui.permission_mode = Some("ask".into());
+            app.current_ui.permission_mode = Some("legion".into());
             refresh_open_settings_modals(app);
             if let Some(a) = app.agents.get_mut(&id) {
-                a.show_mode_switch_banner("Normal");
+                a.show_mode_switch_banner("Legion Multi-Agent DAG");
             }
-            tracing::info!("Mode cycle: Always-Approve → Normal");
+            tracing::info!("Mode cycle: Always-Approve → Legion Multi-Agent DAG");
             vec![Effect::PersistPermissionMode {
-                canonical: "ask",
+                canonical: "legion",
                 session_id: Some(session_id),
                 persist: crate::app::actions::PermissionModePersist::BestEffort,
             }]
