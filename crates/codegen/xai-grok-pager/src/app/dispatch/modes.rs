@@ -487,6 +487,7 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
         PermissionModeKind::Auto => "\u{2713} Permission mode: Auto (classifier)".to_string(),
         PermissionModeKind::Ask => "\u{2713} Permission mode: Ask".to_string(),
         PermissionModeKind::Default => "\u{2713} Permission mode: Default".to_string(),
+        PermissionModeKind::Legion => "\u{2713} Permission mode: Legion Multi-Agent DAG".to_string(),
     }
 }
 

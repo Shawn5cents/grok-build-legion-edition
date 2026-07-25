@@ -126,6 +126,7 @@ fn permission_mode_artifact_str(mode: xai_grok_telemetry::enums::PermissionMode)
     match mode {
         PermissionMode::AlwaysApprove => "always-approve",
         PermissionMode::Auto => "auto",
+        PermissionMode::Legion => "legion",
         PermissionMode::Ask => "ask",
     }
 }

@@ -117,6 +117,11 @@ const PERMISSION_MODE_CHOICES: &[EnumChoice] = &[
         display: "Always approve",
         description: "Auto-approve every tool action. Skips ALL permission prompts.",
     },
+    EnumChoice {
+        canonical: "legion",
+        display: "Legion Multi-Agent DAG",
+        description: "Heterogeneous multi-agent graph routing tasks to specialized subagents.",
+    },
 ];
 
 // ---------------------------------------------------------------------------

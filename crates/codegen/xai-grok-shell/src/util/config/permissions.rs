@@ -16,6 +16,7 @@ pub fn parse_permission_mode_canonical(mode_str: &str) -> PermissionMode {
     match mode_str {
         "always-approve" => PermissionMode::AlwaysApprove,
         "auto" => PermissionMode::Auto,
+        "legion" => PermissionMode::Legion,
         "ask" => PermissionMode::Ask,
         "default" => PermissionMode::Ask,
         _ => PermissionMode::Ask,
@@ -30,6 +31,7 @@ pub fn permission_mode_canonical_str(mode: PermissionMode) -> &'static str {
     match mode {
         PermissionMode::AlwaysApprove => "always-approve",
         PermissionMode::Auto => "auto",
+        PermissionMode::Legion => "legion",
         PermissionMode::Ask => "ask",
     }
 }

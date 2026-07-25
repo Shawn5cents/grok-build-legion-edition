@@ -1035,6 +1035,8 @@ pub enum PermissionModeKind {
     Auto,
     /// Auto-approve all tool actions. `yolo_mode = true`.
     AlwaysApprove,
+    /// Heterogeneous multi-agent DAG mode.
+    Legion,
 }
 impl PermissionModeKind {
     /// Canonical persisted/wire string for the kind. Matches the
@@ -1046,6 +1048,7 @@ impl PermissionModeKind {
             Self::Ask => "ask",
             Self::Auto => "auto",
             Self::AlwaysApprove => "always-approve",
+            Self::Legion => "legion",
         }
     }
     /// Bool projection onto the YOLO runtime flag — `AlwaysApprove

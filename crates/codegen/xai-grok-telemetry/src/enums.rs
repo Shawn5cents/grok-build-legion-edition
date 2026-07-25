@@ -47,6 +47,8 @@ pub enum PermissionMode {
     AlwaysApprove,
     /// LLM transcript classifier reviews non-fast-path tool calls.
     Auto,
+    /// Heterogeneous multi-agent DAG mode.
+    Legion,
 }
 
 impl PermissionMode {
@@ -56,6 +58,10 @@ impl PermissionMode {
 
     pub fn is_auto(self) -> bool {
         matches!(self, Self::Auto)
+    }
+
+    pub fn is_legion(self) -> bool {
+        matches!(self, Self::Legion)
     }
 
     pub fn from_yolo(yolo: bool) -> Self {
