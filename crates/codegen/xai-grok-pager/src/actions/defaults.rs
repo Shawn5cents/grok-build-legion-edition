@@ -624,6 +624,21 @@ pub(super) fn default_actions(
             requires_confirmation: false,
             long_help: Some(send_to_background_help),
         },
+        ActionDef {
+            id: ActionId::ToggleSubagents,
+            label: "subagents",
+            description: "Toggle subagent view panel at top",
+            default_key: key!('b', CONTROL),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: None,
+            hint_key_display: None,
+            requires_confirmation: false,
+            long_help: Some(
+                "Shows or hides the subagent view panel at the top: browse active subagents, personas, and specialized roles.\nToggle it off with Ctrl+B to reclaim screen space.",
+            ),
+        },
         // ── Prompt ───────────────────────────────────────────────────
         ActionDef {
             id: ActionId::InterjectPrompt,

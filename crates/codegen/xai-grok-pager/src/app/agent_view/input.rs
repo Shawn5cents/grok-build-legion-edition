@@ -1145,6 +1145,28 @@ impl AgentView {
         }
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
+            && (key!('b', CONTROL).matches(key) || registry.matches_id(ActionId::ToggleSubagents, key))
+        {
+            if !self.is_subagent_view
+                && self
+                    .session
+                    .tracker
+                    .running_execute_tool_call_id()
+                    .is_some()
+            {
+                return self.handle_agent_action_with_registry(ActionId::SendToBackground, registry);
+            }
+            self.catalog.overlay.toggle();
+            self.catalog.on_state_change();
+            if self.catalog.overlay.focused {
+                self.set_active_pane(AgentPane::Catalog, false);
+            } else if self.active_pane == AgentPane::Catalog {
+                self.set_active_pane(AgentPane::Scrollback, false);
+            }
+            return InputOutcome::Changed;
+        }
+        if let Event::Key(key) = ev
+            && key.kind != KeyEventKind::Release
             && key!('s', CONTROL).matches(key)
         {
             self.active_modal = Some(ActiveModal::SessionPicker {

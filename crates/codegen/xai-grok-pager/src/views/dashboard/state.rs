@@ -4452,6 +4452,7 @@ fn dashboard_action_for_id(
         | ActionId::OpenPrevLink
         | ActionId::ToggleTodos
         | ActionId::ToggleTasks
+        | ActionId::ToggleSubagents
         | ActionId::EditPromptExternal
         | ActionId::ToggleQueue
         | ActionId::OpenSessions

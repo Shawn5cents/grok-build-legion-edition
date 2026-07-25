@@ -3521,6 +3521,7 @@ impl MvpAgent {
         let respect_gitignore = self.cfg.borrow().respect_gitignore;
         let path_not_found_hints = self.cfg.borrow().path_not_found_hints;
         let subagent_toggle = self.cfg.borrow().subagent_toggle.clone();
+        let subagent_model_overrides = self.cfg.borrow().subagent_model_overrides.clone();
         let handle_display_cwd = prompt_display_cwd.clone();
         let auth_manager = Some(self.auth_manager.clone());
         let bash_params_json = {
@@ -3746,6 +3747,7 @@ impl MvpAgent {
                     client_hooks,
                     prompt_display_cwd,
                     subagent_toggle,
+                    subagent_model_overrides,
                     Vec::new(),
                     xai_grok_agent::prompt::context::PromptAudience::Primary,
                     None,

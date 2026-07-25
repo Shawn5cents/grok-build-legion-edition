@@ -460,6 +460,14 @@ impl AgentView {
         _registry: &ActionRegistry,
     ) -> InputOutcome {
         use crate::views::overlay::{handle_overlay_key, handle_overlay_nav_key};
+        if _registry.matches_id(ActionId::ToggleSubagents, key) || key!('b', CONTROL).matches(key) {
+            self.catalog.overlay.toggle();
+            self.catalog.on_state_change();
+            if !self.catalog.overlay.visible || !self.catalog.overlay.focused {
+                self.set_active_pane(AgentPane::Scrollback, false);
+            }
+            return InputOutcome::Changed;
+        }
         let has_input = self.catalog.list_state.input_mode().is_some();
         let action = handle_overlay_key(&mut self.catalog.overlay, key).or_else(|| {
             if !has_input {

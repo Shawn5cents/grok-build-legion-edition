@@ -91,6 +91,7 @@ pub enum ActionId {
     // Panes
     ToggleTodos,
     ToggleTasks,
+    ToggleSubagents,
     ToggleQueue,
     OpenSessions,
     OpenExtensions,

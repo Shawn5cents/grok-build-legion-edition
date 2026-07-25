@@ -1097,6 +1097,7 @@ pub(crate) async fn run_shell_child(
         ctx.client_hooks.clone(),
         None,
         std::collections::HashMap::new(),
+        ctx.subagent_model_overrides.clone(),
         Vec::new(),
         xai_grok_agent::prompt::context::PromptAudience::Subagent,
         effective_runtime.role_prompt.clone(),

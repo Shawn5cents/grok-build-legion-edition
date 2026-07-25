@@ -457,15 +457,23 @@ impl SubagentsConfig {
         user_grok_root: Option<&std::path::Path>,
         bundled_root: &std::path::Path,
     ) -> Self {
-        let mut result: Self = config
-            .get("subagents")
+        let subagents_val = config.get("subagents");
+        let has_explicit_enabled = subagents_val
+            .and_then(|v| v.as_table())
+            .map_or(false, |t| t.contains_key("enabled"));
+        let mut result: Self = subagents_val
             .and_then(|v| v.clone().try_into().ok())
             .unwrap_or_default();
+        let config_enabled = if has_explicit_enabled {
+            result.enabled
+        } else {
+            true
+        };
         let resolved = crate::agent::config::resolve_enabled(
             if cli_flag { Some(true) } else { None },
             "GROK_SUBAGENTS",
-            result.enabled,
-            config.get("subagents").is_some(),
+            config_enabled,
+            has_explicit_enabled,
             None,
             true,
         );

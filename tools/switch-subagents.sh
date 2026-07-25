@@ -46,11 +46,28 @@ with open(preset_path) as f:
 
 preset_match = re.search(r'\[subagents\.models\]\n((?:.+\n)*)', preset)
 if preset_match:
-    new_block = '[subagents.models]\n' + preset_match.group(1)
-    if match:
-        new_config = config[:match.start()] + new_block + config[match.end():]
+    subagents_header = '[subagents]\nenabled = true\n\n'
+    if '[subagents]' in config and '[subagents.models]' in config:
+        pattern = r'(\[subagents\].*?\n\[subagents\.models\]\n)((?:.*\n)*?)(?=\n\[|$)'
+        match = re.search(pattern, config, re.DOTALL)
+        if match:
+            new_block = '[subagents]\nenabled = true\n\n[subagents.models]\n' + preset_match.group(1)
+            new_config = config[:match.start()] + new_block + config[match.end():]
+        else:
+            pattern_models = r'(\[subagents\.models\]\n)((?:.*\n)*?)(?=\n\[|$)'
+            match_m = re.search(pattern_models, config)
+            if match_m:
+                new_block = '[subagents]\nenabled = true\n\n[subagents.models]\n' + preset_match.group(1)
+                new_config = config[:match_m.start()] + new_block + config[match_m.end():]
+            else:
+                new_config = config + '\n' + subagents_header + '[subagents.models]\n' + preset_match.group(1)
+    elif '[subagents.models]' in config:
+        pattern_models = r'(\[subagents\.models\]\n)((?:.*\n)*?)(?=\n\[|$)'
+        match_m = re.search(pattern_models, config)
+        new_block = '[subagents]\nenabled = true\n\n[subagents.models]\n' + preset_match.group(1)
+        new_config = config[:match_m.start()] + new_block + config[match_m.end():]
     else:
-        new_config = config + '\n' + new_block
+        new_config = config.rstrip() + '\n\n' + subagents_header + '[subagents.models]\n' + preset_match.group(1)
     with open(config_path, 'w') as f:
         f.write(new_config)
     print(f'Successfully switched DAG preset to: {preset_name}')

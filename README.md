@@ -32,10 +32,10 @@
 
 ## 💡 Overview
 
-**Grok Build Legion Edition** is a **100% Model-, CLI-, Provider-, and Gateway-Agnostic** terminal coding agent system. Built on xAI's high-performance Rust engine, Legion unlocks the ability to use **ANY model**, **ANY local or cloud provider**, **ANY gateway proxy**, and **ANY CLI tool** for each specialized subagent role (`orchestrator`, `explore`, `plan`, `general-purpose` coder, `verifier` critic).
+**Grok Build Legion Edition** is a **100% Model-, CLI-, Provider-, and Gateway-Agnostic** terminal coding agent system. Built on xAI's high-performance Rust engine, Legion unlocks the ability to use **ANY model**, **ANY local or cloud provider**, **ANY gateway proxy**, and **ANY CLI tool** for each specialized subagent role (`orchestrator`, `explore`, `architect`, `implementor` coder, `verifier` critic).
 
 > [!IMPORTANT]
-> **Universal Freedom**: You are NEVER locked into specific models or providers. Whether you use local models (Ollama, LM Studio, vLLM), cloud SaaS providers (OpenAI, DeepSeek, Anthropic, Gemini, Grok, MiniMax, Qwen, Moonshot), universal gateways (CLIProxyAPI, LiteLLM, OpenRouter, ZenMux, Kilo Code, Cline Pass), or direct API endpoints — Legion automatically discovers and works with whatever you have configured!
+> **Universal Freedom**: You are NEVER locked into specific models or providers. Whether you use local models (Ollama, LM Studio, vLLM), OpenCode Go & OpenCode Zen (`opencode/big-pickle`), NVIDIA NIM (`nvidia/*`), Venice AI (`venice/*`), 100% Free Tiers (`free-legion-dag`), cloud SaaS providers (OpenAI, DeepSeek, Anthropic, Gemini, Grok, MiniMax, Qwen, Moonshot), universal gateways (OpenRouter, ZenMux, Kilo Code, Cline Pass), or direct API endpoints — Legion automatically discovers and works with whatever you have configured!
 
 ---
 
@@ -43,9 +43,9 @@
 
 Legion decouples agent roles from specific vendor lock-in:
 
-- **Bring Any Model**: DeepSeek, OpenAI / Codex, Anthropic / Claude, Google Gemini, xAI Grok, MiniMax, Qwen, Mistral, Moonshot Kimi, Llama 3, CodeLlama, or local Ollama models.
-- **Bring Any Gateway or Proxy**: `CLIProxyAPI`, LiteLLM, OpenRouter, ZenMux, Kilo Code, Cline Pass, vLLM, local HTTP proxies, or direct SaaS API endpoints.
-- **Bring Any CLI Tool**: Automatically detects and leverages `ollama`, `opencode`, `codex`, `cline`, `agy`, `python3`, `go`, and local binaries installed on your system.
+- **Bring Any Model**: OpenCode Big Pickle (`opencode/big-pickle`), NVIDIA NIM (`nvidia/nemotron-3-ultra-550b`), Venice AI (`venice/hermes-3-llama-3.1-405b`), DeepSeek V4 Pro/Flash, Anthropic Claude 5 Sonnet/Opus, OpenAI GPT-5.6 Sol/Terra & Codex, Google Gemini 3.6 Flash, xAI Grok 4.5, MiniMax-M3, Qwen 3.7 Max, Moonshot Kimi K3, 100% Free Tier models, or local Ollama models.
+- **Bring Any Gateway or Provider**: OpenCode Go (`http://localhost:4096`), NVIDIA NIM (`https://integrate.api.nvidia.com/v1`), Venice AI (`https://api.venice.ai/api/v1`), OpenRouter, ZenMux, Kilo Code, Cline Pass, CLIProxyAPI, LiteLLM, vLLM, local HTTP proxies, or direct SaaS API endpoints.
+- **Bring Any CLI Tool**: Automatically detects and leverages `opencode`, `ollama`, `codex`, `cline`, `agy`, `legion`, `python3`, `go`, and local binaries installed on your system.
 - **100% Upstream Git Hygiene**: Zero core engine modifications required — preserves 100% clean `git pull upstream main` compatibility.
 
 ---
@@ -61,25 +61,25 @@ graph TD
 
     subgraph DAG ["🕸️ Heterogeneous Specialist Graph"]
         Router -->|Complex Task| Explorer["🔍 Explorer"]
-        Router -->|Complex Task| Plan["📐 Architecture Planner"]
+        Router -->|Complex Task| Architect["📐 Architect Planner"]
         
-        Explorer --> Implementer["💻 Implementer / Coder"]
-        Plan --> Implementer
+        Explorer --> Implementor["💻 Implementor / Coder"]
+        Architect --> Implementor
         
-        Implementer --> Verifier["🛡️ Verifier Critic"]
+        Implementor --> Verifier["🛡️ Verifier Critic"]
         
         Verifier -->|PASS| Final["✅ Final Task Completion"]
         Verifier -->|FAIL| Repair["↺ 1 Bounded Repair Loop"]
-        Repair --> Implementer
+        Repair --> Implementor
     end
 
-    Router -->|Trivial Task| Implementer
+    Router -->|Trivial Task| Implementor
 
     style User fill:#10002B,stroke:#7B2CBF,stroke-width:2px,color:#fff
     style Router fill:#3C096C,stroke:#C77DFF,stroke-width:3px,color:#fff
     style Explorer fill:#240046,stroke:#9D4EDD,stroke-width:2px,color:#fff
-    style Plan fill:#240046,stroke:#9D4EDD,stroke-width:2px,color:#fff
-    style Implementer fill:#3C096C,stroke:#E0AAFF,stroke-width:3px,color:#fff
+    style Architect fill:#240046,stroke:#9D4EDD,stroke-width:2px,color:#fff
+    style Implementor fill:#3C096C,stroke:#E0AAFF,stroke-width:3px,color:#fff
     style Verifier fill:#5A189A,stroke:#FF85A1,stroke-width:3px,color:#fff
     style Final fill:#003566,stroke:#00B4D8,stroke-width:2px,color:#fff
     style Repair fill:#5c001e,stroke:#ff4d4f,stroke-width:2px,color:#fff
@@ -93,10 +93,10 @@ Legion ships with intuitive interactive tools so you can configure models and pr
 
 | Command | Description |
 |---|---|
-| **`legion-hub`** *(or `legion hub`)* | **Ultimate Visual Control Panel**: Browse model catalog by context window, assign models to roles, select presets, view live DAG topology, and launch sessions. |
-| **`legion-mode`** *(or `legion --mode`)* | **Preset Profile Switcher**: Instantly switch between profiles (`Original Grok 4.5`, `Legion DAG`, `Cline/Codex`, `Auto-Discovered`) or run `legion-mode create` to build a custom preset. |
+| **`legion-hub`** *(or `legion hub`)* | **Ultimate Visual Control Panel**: Browse model catalog by context window, assign models to roles (`architect`, `implementor`), select presets, view live DAG topology, and launch sessions. |
+| **`legion-mode`** *(or `legion --mode`)* | **Preset Profile Switcher**: Instantly switch between profiles (`Legion DAG`, `Big Pickle DAG`, `Free Legion DAG`, `NVIDIA NIM DAG`, `Venice AI DAG`, `Cline/Codex`, `Auto-Discovered`) or run `legion-mode create` to build a custom preset. |
 | **`legion-config`** | **Model & Role Editor**: Interactively change models for individual subagent roles or apply **one single LLM to ALL roles at once** (`legion-config --all <model>`). |
-| **`./tools/auto-discover.py`** | **Zero-Touch Capability Scan**: Automatically scans system API keys, local binaries (`ollama`, `opencode`, `codex`, `cline`, `agy`), and running proxies to generate a tailored profile. |
+| **`./tools/auto-discover.py`** | **Zero-Touch Capability Scan**: Automatically scans system API keys (`OPENCODE`, `NVIDIA`, `VENICE`, `DEEPSEEK`, `ANTHROPIC`, `XAI`, `OPENROUTER`, `ZENMUX`, `KIMI`), local binaries (`opencode`, `ollama`, `codex`, `cline`, `agy`), and running endpoints to generate a tailored profile. |
 
 ---
 

@@ -4,9 +4,9 @@ Legion Hub — Ultimate User-Friendly Flow & Menu System
 for Models, Subagents, Roles, and Model Catalog.
 
 Provides an intuitive, visual, step-by-step menu system for:
-1. Browsing the Unified Model Catalog (by Provider & Context Window)
-2. Mapping Models to Subagent DAG Roles (Orchestrator, Explore, Plan, Coder, Verifier)
-3. One-Click DAG Preset Selection
+1. Browsing the Unified Model Catalog (OpenCode Big Pickle, NVIDIA NIM, Venice AI, Free Models, SaaS, Gateways)
+2. Mapping Models to Subagent DAG Roles (Orchestrator, Explore, Architect, Implementor, Verifier)
+3. One-Click DAG Preset Selection (Legion, Big Pickle, Free Tier, NVIDIA NIM, Venice AI, Cline Pass, OpenRouter, ZenMux)
 4. Zero-Touch System Capability Scan
 5. Live Proxy & Connection Verification
 """
@@ -34,41 +34,60 @@ AUTO_SCRIPT = Path(__file__).resolve().parent / "auto-discover.py"
 
 # Categorized Model Catalog
 MODEL_CATALOG = {
+    "OpenCode Zen & Stealth": [
+        {"id": "opencode/big-pickle", "name": "Big Pickle", "ctx": "200,000", "desc": "Stealth reasoning & multi-step refactoring ($0 Free Tier)"},
+        {"id": "opencode/deepseek-v4-flash-free", "name": "DeepSeek V4 Flash Free", "ctx": "1,000,000", "desc": "Ultra-fast free explorer"},
+    ],
+    "NVIDIA NIM": [
+        {"id": "nvidia/nvidia/nemotron-3-ultra-550b-a55b", "name": "Nemotron 550B MoE", "ctx": "128,000", "desc": "High-capacity reasoning & architecture"},
+        {"id": "nvidia/deepseek-ai/deepseek-v4-pro", "name": "DeepSeek V4 Pro (NIM)", "ctx": "1,000,000", "desc": "NVIDIA hardware-accelerated DeepSeek V4"},
+        {"id": "nvidia/meta/llama-3.3-70b-instruct", "name": "Llama 3.3 70B (NIM)", "ctx": "128,000", "desc": "NIM general coding & implementation"},
+    ],
+    "Venice AI (Privacy & Uncensored)": [
+        {"id": "venice/hermes-3-llama-3.1-405b", "name": "Hermes 3 Llama 405B", "ctx": "128,000", "desc": "Uncensored 405B frontier lead"},
+        {"id": "venice/deepseek-r1", "name": "DeepSeek R1 (Venice)", "ctx": "128,000", "desc": "Zero-data-retention reasoning model"},
+        {"id": "venice/qwen-2.5-coder-32b", "name": "Qwen 2.5 Coder (Venice)", "ctx": "128,000", "desc": "Private high-speed code generator"},
+    ],
+    "100% Free / Zero-Cost Tiers": [
+        {"id": "zenmux/anthropic/claude-sonnet-5-free", "name": "Claude Sonnet 5 Free", "ctx": "200,000", "desc": "Zero-cost Claude Sonnet 5 via ZenMux"},
+        {"id": "zenmux/moonshotai/kimi-k3-free", "name": "Kimi K3 Free", "ctx": "1,000,000", "desc": "Zero-cost 2.8T Kimi K3 model"},
+        {"id": "openrouter/openrouter/free", "name": "OpenRouter Free Router", "ctx": "200,000", "desc": "Automatic $0 free tier model router"},
+    ],
     "DeepSeek": [
-        {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "ctx": "1,000,000", "desc": "Frontier reasoning & DAG lead"},
-        {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "ctx": "1,000,000", "desc": "Ultra-fast codebase exploration"},
+        {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "ctx": "1,000,000", "desc": "1.6T parameter reasoning & architect lead"},
+        {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "ctx": "1,000,000", "desc": "Ultra-fast codebase exploration specialist"},
+    ],
+    "Anthropic / Claude": [
+        {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "ctx": "200,000", "desc": "Flagship coding & architecture model"},
+        {"id": "claude-opus-5", "name": "Claude Opus 5", "ctx": "200,000", "desc": "Frontier reasoning & lead model"},
+    ],
+    "OpenAI / Codex": [
+        {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol", "ctx": "128,000", "desc": "Flagship reasoning & complex planning"},
+        {"id": "openai/gpt-5-codex", "name": "Codex Latest (gpt-5-codex)", "ctx": "128,000", "desc": "OpenAI Codex developer interface"},
     ],
     "xAI / Grok": [
         {"id": "grok-4.5", "name": "Grok 4.5", "ctx": "500,000", "desc": "Frontier verifier critic & standard engine"},
     ],
-    "OpenAI / Codex": [
-        {"id": "codex-latest", "name": "Codex Latest (gpt-5-codex)", "ctx": "128,000", "desc": "OpenAI Codex / Copilot interface"},
-    ],
-    "Cline Pass": [
-        {"id": "cline-pass", "name": "Cline Pass Default", "ctx": "200,000", "desc": "Cline Pass subscription gateway model"},
-    ],
     "Moonshot / Kimi": [
-        {"id": "kimi-code-k3", "name": "Kimi K3", "ctx": "1,000,000", "desc": "2.8T parameter Moonshot coding model"},
+        {"id": "kimi-k3", "name": "Kimi K3", "ctx": "1,000,000", "desc": "2.8T parameter Moonshot coding model"},
     ],
     "MiniMax": [
         {"id": "MiniMax-M3", "name": "MiniMax-M3", "ctx": "1,000,000", "desc": "Implementation & coding specialist"},
     ],
     "Google / Antigravity": [
-        {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "ctx": "1,000,000", "desc": "High-throughput fast Gemini model"},
+        {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash", "ctx": "1,000,000", "desc": "High-throughput fast Gemini workhorse"},
         {"id": "gemini-3.1-pro", "name": "Gemini 3.1 Pro", "ctx": "1,000,000", "desc": "Complex reasoning Gemini model"},
     ],
-    "Universal SaaS": [
-        {"id": "openrouter/auto", "name": "OpenRouter Auto", "ctx": "200,000", "desc": "Universal SaaS OpenRouter gateway"},
-        {"id": "zenmux/z-ai/glm-5.2", "name": "GLM 5.2 (ZenMux)", "ctx": "128,000", "desc": "ZenMux multi-provider gateway"},
-        {"id": "kilo-code", "name": "Kilo Code", "ctx": "200,000", "desc": "Kilo Code developer gateway"},
+    "Qwen / Alibaba": [
+        {"id": "qwen3.7-max", "name": "Qwen 3.7 Max", "ctx": "128,000", "desc": "Frontier agentic coding model"},
     ],
 }
 
 ROLES = [
     ("orchestrator", "🧠 Orchestrator / Lead", "Top-level coordinator and task router"),
     ("explore", "🔍 Explore Specialist", "Read-only codebase investigator"),
-    ("plan", "📐 Architecture Planner", "System design and implementation planner"),
-    ("general-purpose", "💻 Coder / Implementer", "Code modification and task execution"),
+    ("architect", "📐 Architecture Planner", "System design and technical planner (formerly 'plan')"),
+    ("implementor", "💻 Coder / Implementer", "Code modification and task execution (formerly 'general-purpose')"),
     ("verifier", "🛡️ Verifier Critic", "Read-only quality & test verifier"),
 ]
 
@@ -101,8 +120,13 @@ def save_models_to_config(models):
 
     new_block_lines = ["[subagents.models]"]
     for role_key, _, _ in ROLES:
-        val = models.get(role_key, "grok-4.5")
+        val = models.get(role_key) or models.get("plan" if role_key == "architect" else ("general-purpose" if role_key == "implementor" else "grok-4.5"), "grok-4.5")
         new_block_lines.append(f'{role_key:<15} = "{val}"')
+    # Backward compatibility aliases
+    if "architect" in models:
+        new_block_lines.append(f'{"plan":<15} = "{models["architect"]}"')
+    if "implementor" in models:
+        new_block_lines.append(f'{"general-purpose":<15} = "{models["implementor"]}"')
     new_block = "\n".join(new_block_lines) + "\n"
 
     pattern = r'(\[subagents\.models\]\n)((?:.*\n)*?)(?=\n\[|$)'
@@ -117,7 +141,7 @@ def save_models_to_config(models):
 
 def browse_catalog():
     print("\n" + "=" * 70)
-    print("📚 UNIFIED MODEL CATALOG")
+    print("📚 UNIFIED MODEL CATALOG (SaaS, OpenCode, NVIDIA NIM, Venice AI, Free Tiers)")
     print("=" * 70)
     
     all_flat = []
@@ -125,7 +149,7 @@ def browse_catalog():
     for category, models in MODEL_CATALOG.items():
         print(f"\n📂 {category}:")
         for m in models:
-            print(f"  [{idx:2d}] {m['name']:<24} (ID: `{m['id']}`) — {m['desc']} [{m['ctx']} tokens]")
+            print(f"  [{idx:2d}] {m['name']:<30} (ID: `{m['id']}`) — {m['desc']} [{m['ctx']} tokens]")
             all_flat.append(m)
             idx += 1
 
@@ -145,14 +169,14 @@ def role_assignment_flow():
             flat_catalog.append(m)
 
     for r_key, r_title, r_desc in ROLES:
-        cur = models.get(r_key, "grok-4.5")
+        cur = models.get(r_key) or models.get("plan" if r_key == "architect" else ("general-purpose" if r_key == "implementor" else "grok-4.5"), "grok-4.5")
         print(f"\nRole: {r_title}")
         print(f"Description: {r_desc}")
         print(f"Current Model: {cur}")
         print("-" * 50)
 
         for i, m in enumerate(flat_catalog, 1):
-            print(f"  [{i:2d}] {m['name']:<22} (`{m['id']}`)")
+            print(f"  [{i:2d}] {m['name']:<32} (`{m['id']}`)")
         print("  [c]  Enter Custom Model ID")
         print("  [k]  Keep Current Model")
 
@@ -183,16 +207,19 @@ def preset_selection_flow():
 
     presets = [
         ("grok-unified", "🌟 Standard Grok 4.5", "Stock out-of-the-box Grok 4.5 for all roles"),
-        ("legion-dag", "🕸️ Legion Multi-Agent DAG", "DeepSeek V4 Pro + Flash + MiniMax + Grok Verifier"),
+        ("legion-dag", "🕸️ Legion Multi-Agent DAG", "DeepSeek V4 Pro (Architect) + Flash (Explore) + MiniMax-M3 (Implementor) + Grok 4.5 (Verifier)"),
+        ("big-pickle-dag", "🥒 Big Pickle DAG", "OpenCode Big Pickle (Architect/Lead) + DeepSeek Flash Free + Nemotron 550B"),
+        ("free-legion-dag", "🎁 100% Free / Zero-Cost DAG", "$0 Cost: Free Claude Sonnet 5 + Free Kimi K3 + DeepSeek Flash Free"),
+        ("nvidia-nim-dag", "🟢 NVIDIA NIM DAG", "Nemotron 550B + DeepSeek R1 NIM + Llama 3.3 70B"),
+        ("venice-ai-dag", "🪟 Venice AI Privacy DAG", "Hermes 3 Llama 405B + Venice DeepSeek R1 + Qwen Coder (Zero-Data-Retention)"),
         ("cline-pass-dag", "✨ Cline Pass + Codex + Kimi", "Cline Pass + Kimi K3 + Codex Latest + Grok Verifier"),
-        ("flash-orchestrator", "⚡ Fast Flash Coordinator", "DeepSeek V4 Flash fast coordinator profile"),
         ("auto-discovered", "🔍 Auto-Discovered Profile", "Tailored profile based on system capability scan"),
     ]
 
     for idx, (p_id, p_name, p_desc) in enumerate(presets, 1):
-        print(f"  [{idx}] {p_name:<28} — {p_desc}")
+        print(f"  [{idx}] {p_name:<32} — {p_desc}")
 
-    print("\nSelect a preset to activate [1-5, or b to back]: ")
+    print("\nSelect a preset to activate [1-8, or b to back]: ")
     try:
         ans = input().strip()
     except (KeyboardInterrupt, EOFError):
@@ -216,8 +243,8 @@ def view_current_dag():
 
     orch = models.get("orchestrator", "grok-4.5")
     exp = models.get("explore", "grok-4.5")
-    pln = models.get("plan", "grok-4.5")
-    coder = models.get("general-purpose", "grok-4.5")
+    arch = models.get("architect") or models.get("plan", "grok-4.5")
+    imp = models.get("implementor") or models.get("general-purpose", "grok-4.5")
     ver = models.get("verifier", "grok-4.5")
 
     print(f"""
@@ -229,14 +256,14 @@ def view_current_dag():
                     +-------------+-------------+
                     |                           |
            +--------v--------+         +--------v--------+
-           | Explore         |         | Plan            |
-           | {exp:<15} |         | {pln:<15} |
+           | Explore         |         | Architect       |
+           | {exp:<15} |         | {arch:<15} |
            +--------+--------+         +--------+--------+
                     +-------------+-------------+
                                   |
                         +---------v----------+
-                        | Coder / Implementer|
-                        | {coder:<18} |
+                        | Implementor / Coder|
+                        | {imp:<18} |
                         +---------+----------+
                                   |
                         +---------v----------+
@@ -259,13 +286,13 @@ def main_menu():
         print(" Active DAG Mapping:")
         print(f"  • Orchestrator : {models.get('orchestrator', 'grok-4.5')}")
         print(f"  • Explore      : {models.get('explore', 'grok-4.5')}")
-        print(f"  • Plan         : {models.get('plan', 'grok-4.5')}")
-        print(f"  • Coder        : {models.get('general-purpose', 'grok-4.5')}")
+        print(f"  • Architect    : {models.get('architect') or models.get('plan', 'grok-4.5')}")
+        print(f"  • Implementor  : {models.get('implementor') or models.get('general-purpose', 'grok-4.5')}")
         print(f"  • Verifier     : {models.get('verifier', 'grok-4.5')}")
         print("-" * 70)
         print("  [1] 📚 Browse Model Catalog (Context Windows & Descriptions)")
         print("  [2] 🎯 Step-by-Step Subagent Role Assignment Flow")
-        print("  [3] 🎛️ Select DAG Preset Profile (Legion, Cline/Codex, Grok)")
+        print("  [3] 🎛️ Select DAG Preset Profile (Legion, Big Pickle, Free Tier, NIM, Venice AI)")
         print("  [4] 👁️ View Active DAG Flow Diagram")
         print("  [5] 🔍 Run Zero-Touch System Capability Scan")
         print("  [6] 🚀 Launch Legion Session")

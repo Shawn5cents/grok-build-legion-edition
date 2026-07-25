@@ -1,4 +1,4 @@
-# Heterogeneous agent architecture
+# Heterogeneous Agent Architecture
 
 Legion is released by Nichols AI.
 
@@ -13,9 +13,9 @@ contractive critic or verification edges before consequential outputs.
 What sets **grok-build-legion-edition** apart is its **Zero-Touch Auto-Discovery Engine** (`tools/auto-discover.py`).
 
 Instead of manually editing TOML files or wiring providers in Rust, running auto-discovery automatically scans:
-1. **Environment API Keys**: Detects `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `ZENMUX_API_KEY`, `KIMI_API_KEY`, `CLINE_API_KEY`, `XAI_API_KEY`.
-2. **Installed CLI Tools**: Detects `Ollama`, `OpenCode`, `LiteLLM`, `Legion`, `Horde`, and `CLIProxyAPI`.
-3. **Active Local Endpoints**: Probes HTTP ports 8317 (CLIProxyAPI), 11434 (Ollama), 4000 (LiteLLM), 1234 (LM Studio).
+1. **Environment API Keys**: Detects `OPENCODE_API_KEY`, `NVIDIA_API_KEY` (`NVAPI_KEY`), `VENICE_API_KEY`, `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `ZENMUX_API_KEY`, `KIMI_API_KEY`, `CLINE_API_KEY`, `CODEX_API_KEY`, `KILO_API_KEY`, `AGY_API_KEY`, `XAI_API_KEY`.
+2. **Installed CLI Tools**: Detects `OpenCode`, `Ollama`, `LiteLLM`, `Legion`, `Horde`, `agy`, `codex`, `cline`, `go`, and `python3`.
+3. **Active Local Endpoints**: Probes HTTP ports 4096 (OpenCode Go), 8317 (CLIProxyAPI), 11434 (Ollama), 4000 (LiteLLM), 1234 (LM Studio).
 4. **Auto-Configures Best DAG Profile**: Instantly generates `auto-discovered.toml` tailored to your machine's exact installed keys and tools!
 
 ```bash
@@ -26,7 +26,7 @@ Instead of manually editing TOML files or wiring providers in Rust, running auto
 ./tools/switch-subagents.sh auto-discovered
 ```
 
-## Runtime graph
+## Runtime Graph
 
 ```text
                          +-----------------------+
@@ -38,15 +38,15 @@ Instead of manually editing TOML files or wiring providers in Rust, running auto
                           +----------+----------+
                           |                     |
                  +--------v--------+   +--------v--------+
-                 | V4 Flash        |   | V4 Pro          |
-                 | explore         |   | plan            |
+                 | V4 Flash        |   | Nemotron 550B   |
+                 | explore         |   | architect       |
                  +--------+--------+   +--------+--------+
                           +----------+----------+
                                      |
                            +---------v----------+
                            | MiniMax-M3         |
-                           | general-purpose    |
-                           | implementation     |
+                           | implementor        |
+                           | execution          |
                            +---------+----------+
                                      |
                            +---------v----------+
@@ -65,22 +65,28 @@ downstream decision, and it forbids unbounded agent chains and critique loops.
 This controls routing regret and organizational entropy while retaining
 specialization.
 
-## Consolidated Provider Gateway (`CLIProxyAPI`)
+## Consolidated Provider & Gateway Connections
 
 To maintain 100% clean upstream Git sync without modifying Rust engine source code,
-all providers (OpenCode, OpenRouter, ZenMux, Kilo Code, Cline Pass, Codex, Kimi Code, DeepSeek, MiniMax, Anthropic, xAI) route through a high-performance local **`CLIProxyAPI` Go Server** listening on `http://localhost:8317/v1`.
+Legion connects natively to direct provider APIs, local proxy engines, and cloud gateways:
 
-### Supported Provider Routes
+### Supported Native Provider Routes
 
-| Local ID | Provider model ID | Gateway Route | Context Window |
+| Local / Catalog Model ID | Provider Name | Direct / Gateway Endpoint Route | Context Window |
 |---|---|---|---:|
-| `deepseek-v4-pro` | `deepseek-v4-pro` | `http://localhost:8317/v1` | 1,000,000 |
-| `deepseek-v4-flash` | `deepseek-v4-flash` | `http://localhost:8317/v1` | 1,000,000 |
-| `MiniMax-M3` | `MiniMax-M3` | `http://localhost:8317/v1` | 1,000,000 |
-| `grok-4.5` | `grok-4.5` | `http://localhost:8317/v1` | 500,000 |
-| `cline-pass` | `cline-default` | `https://api.cline.bot/v1` | 200,000 |
-| `codex-latest` | `gpt-5-codex` | `http://localhost:8317/v1` | 128,000 |
-| `kimi-code-k3` | `kimi-k3` | `http://localhost:8317/v1` | 1,000,000 |
+| `opencode/big-pickle` | OpenCode Zen (Stealth) | `http://localhost:4096/v1` | 200,000 |
+| `nvidia/nvidia/nemotron-3-ultra-550b-a55b` | NVIDIA NIM | `https://integrate.api.nvidia.com/v1` | 128,000 |
+| `venice/hermes-3-llama-3.1-405b` | Venice AI | `https://api.venice.ai/api/v1` | 128,000 |
+| `deepseek-v4-pro` | DeepSeek AI | `https://api.deepseek.com/v1` | 1,000,000 |
+| `deepseek-v4-flash` | DeepSeek AI | `https://api.deepseek.com/v1` | 1,000,000 |
+| `claude-sonnet-5` | Anthropic | `https://api.anthropic.com/v1` | 200,000 |
+| `gpt-5.6-sol` | OpenAI | `https://api.openai.com/v1` | 128,000 |
+| `MiniMax-M3` | MiniMax | `https://api.minimax.io/v1` | 1,000,000 |
+| `grok-4.5` | xAI | `https://api.x.ai/v1` | 500,000 |
+| `cline-pass` | Cline Pass | `https://api.cline.bot/v1` | 200,000 |
+| `openai/gpt-5-codex` | Codex | `http://localhost:8317/v1` | 128,000 |
+| `kimi-k3` | Moonshot Kimi | `https://api.moonshot.cn/v1` | 1,000,000 |
+| `zenmux/anthropic/claude-sonnet-5-free` | ZenMux Free Tier | `https://zenmux.ai/api/v1` | 200,000 |
 
 ## Model Configuration & Presets
 
@@ -90,9 +96,13 @@ Active subagent role mappings live under `[subagents.models]` in `~/.grok/config
 [subagents.models]
 orchestrator    = "deepseek-v4-pro"
 explore         = "deepseek-v4-flash"
-plan            = "deepseek-v4-pro"
-general-purpose = "MiniMax-M3"
+architect       = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+implementor     = "MiniMax-M3"
 verifier        = "grok-4.5"
+
+# Backward-compatibility aliases for legacy engine components
+plan            = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+general-purpose = "MiniMax-M3"
 ```
 
 ### Rate-Limit Fallback
@@ -118,6 +128,10 @@ Switch model presets live without restarting the agent session:
 
 # Switch presets live
 ./tools/switch-subagents.sh auto-discovered
+./tools/switch-subagents.sh big-pickle-dag
+./tools/switch-subagents.sh free-legion-dag
+./tools/switch-subagents.sh nvidia-nim-dag
+./tools/switch-subagents.sh venice-ai-dag
 ./tools/switch-subagents.sh legion-dag
 ./tools/switch-subagents.sh cline-pass-dag
 ```

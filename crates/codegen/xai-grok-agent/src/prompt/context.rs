@@ -149,6 +149,12 @@ pub struct PromptContext {
     /// Not the UI picker name. Defaults to [`DEFAULT_SYSTEM_PROMPT_LABEL`].
     #[serde(default = "default_system_prompt_label")]
     pub system_prompt_label: String,
+    /// Whether Heterogeneous Multi-Agent DAG Mode / subagents support is enabled.
+    #[serde(default)]
+    pub dag_mode_enabled: bool,
+    /// Active subagent role-to-model mappings.
+    #[serde(default)]
+    pub subagent_models: std::collections::HashMap<String, String>,
 }
 /// Default identity on trim-tool-descriptions (`You are Grok released by xAI`).
 pub const DEFAULT_SYSTEM_PROMPT_LABEL: &str = "Grok";
@@ -193,6 +199,8 @@ impl Default for PromptContext {
             current_date: None,
             is_non_interactive: false,
             system_prompt_label: default_system_prompt_label(),
+            dag_mode_enabled: false,
+            subagent_models: std::collections::HashMap::new(),
         }
     }
 }
@@ -236,6 +244,20 @@ impl PromptContext {
     /// These are the agent-specific values that get merged with the
     /// tool context in `TemplateRenderer::render_with_extra()`.
     pub fn placeholders(&self) -> serde_json::Value {
+        let subagent_models_summary = if self.dag_mode_enabled && !self.subagent_models.is_empty() {
+            let mut keys: Vec<_> = self.subagent_models.keys().cloned().collect();
+            keys.sort();
+            let mut lines = Vec::new();
+            for k in keys {
+                if let Some(v) = self.subagent_models.get(&k) {
+                    lines.push(format!("- **{}**: `{}`", k, v));
+                }
+            }
+            lines.join("\n")
+        } else {
+            String::new()
+        };
+
         serde_json::json!({
             "memory_enabled": self.memory_enabled,
             "memory_global_path": self.memory_global_path.as_deref().unwrap_or(""),
@@ -248,6 +270,8 @@ impl PromptContext {
             "current_date": self.current_date.as_deref().unwrap_or(""),
             "is_non_interactive": self.is_non_interactive,
             "system_prompt_label": self.system_prompt_label.as_str(),
+            "dag_mode_enabled": self.dag_mode_enabled,
+            "subagent_models_summary": subagent_models_summary,
         })
     }
     /// Render the full system prompt via `ToolBridge`.
@@ -326,6 +350,8 @@ mod tests {
             current_date: None,
             is_non_interactive: false,
             system_prompt_label: default_system_prompt_label(),
+            dag_mode_enabled: false,
+            subagent_models: std::collections::HashMap::new(),
         }
     }
     #[test]
@@ -611,6 +637,8 @@ mod tests {
             current_date: None,
             is_non_interactive: false,
             system_prompt_label: default_system_prompt_label(),
+            dag_mode_enabled: false,
+            subagent_models: std::collections::HashMap::new(),
         }
     }
     #[test]

@@ -30,29 +30,47 @@ MODES = [
     {
         "key": "1",
         "preset": "grok-unified",
-        "title": "🌟 Standard Grok 4.5 (Original Out-of-the-Box Mode)",
+        "title": "🌟 Standard Grok 4.5 Mode",
         "desc": "Runs standard Grok 4.5 for all subagent roles, exactly like stock grok."
     },
     {
         "key": "2",
         "preset": "legion-dag",
         "title": "🕸️ Legion Multi-Agent DAG Mode",
-        "desc": "DeepSeek V4 Pro (Lead/Plan) + Flash (Explore) + MiniMax-M3 (Coder) + Grok 4.5 (Verifier)."
+        "desc": "DeepSeek V4 Pro (Architect/Lead) + DeepSeek V4 Flash (Explore) + MiniMax-M3 (Implementor) + Grok 4.5 (Verifier)."
     },
     {
         "key": "3",
-        "preset": "cline-pass-dag",
-        "title": "✨ Cline Pass + Codex + Kimi Code Mode",
-        "desc": "Cline Pass (Lead/Plan) + Kimi K3 (Explore) + Codex Latest (Coder) + Grok 4.5 (Verifier)."
+        "preset": "big-pickle-dag",
+        "title": "🥒 OpenCode Big Pickle DAG Mode",
+        "desc": "OpenCode Big Pickle (Architect/Lead) + DeepSeek Flash Free (Explore) + Nemotron 550B (Verifier)."
     },
     {
         "key": "4",
-        "preset": "flash-orchestrator",
-        "title": "⚡ Fast Flash Coordinator Mode",
-        "desc": "DeepSeek V4 Flash (Fast Lead & Explore) + MiniMax-M3 (Coder) + Grok 4.5 (Verifier)."
+        "preset": "free-legion-dag",
+        "title": "🎁 100% Free / Zero-Cost DAG Mode",
+        "desc": "$0 Cost: Free Claude Sonnet 5 + Free Kimi K3 + DeepSeek Flash Free + Nemotron Ultra Free."
     },
     {
         "key": "5",
+        "preset": "nvidia-nim-dag",
+        "title": "🟢 NVIDIA NIM DAG Mode",
+        "desc": "Nemotron 550B + DeepSeek R1 NIM + Llama 3.3 70B via integrate.api.nvidia.com."
+    },
+    {
+        "key": "6",
+        "preset": "venice-ai-dag",
+        "title": "🪟 Venice AI Privacy DAG Mode",
+        "desc": "Hermes 3 Llama 405B + Venice DeepSeek R1 + Qwen Coder (Zero-Data-Retention & Uncensored)."
+    },
+    {
+        "key": "7",
+        "preset": "cline-pass-dag",
+        "title": "✨ Cline Pass + Codex + Kimi Code Mode",
+        "desc": "Cline Pass (Architect/Lead) + Kimi K3 (Explore) + Codex Latest (Implementor) + Grok 4.5 (Verifier)."
+    },
+    {
+        "key": "8",
         "preset": "auto-discovered",
         "title": "🔍 Zero-Touch Auto-Discovered Mode",
         "desc": "Auto-detects API keys and installed binaries on your machine and generates tailored profile."
@@ -78,8 +96,8 @@ def create_custom_preset():
         
         orchestrator = input("Orchestrator Model [default: deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
         explore      = input("Explore Model      [default: deepseek-v4-flash]: ").strip() or "deepseek-v4-flash"
-        plan         = input("Plan Model         [default: deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
-        coder        = input("Coder Model        [default: MiniMax-M3]: ").strip() or "MiniMax-M3"
+        architect    = input("Architect Model    [default: deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
+        implementor  = input("Implementor Model  [default: MiniMax-M3]: ").strip() or "MiniMax-M3"
         verifier     = input("Verifier Model     [default: grok-4.5]: ").strip() or "grok-4.5"
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
@@ -89,12 +107,18 @@ def create_custom_preset():
     custom_file = PRESETS_DIR / f"{preset_name}.toml"
 
     content = f"""# Custom Preset: {preset_name}
+[subagents]
+enabled = true
+
 [subagents.models]
 orchestrator    = "{orchestrator}"
 explore         = "{explore}"
-plan            = "{plan}"
-general-purpose = "{coder}"
+architect       = "{architect}"
+implementor     = "{implementor}"
 verifier        = "{verifier}"
+# Backward-compatibility aliases
+plan            = "{architect}"
+general-purpose = "{implementor}"
 
 [subagents.fallback]
 verifier = "{orchestrator}"
@@ -143,11 +167,17 @@ def main():
             target_preset = "grok-unified"
         elif choice in ["legion", "dag", "2"]:
             target_preset = "legion-dag"
-        elif choice in ["cline", "codex", "3"]:
+        elif choice in ["pickle", "big-pickle", "3"]:
+            target_preset = "big-pickle-dag"
+        elif choice in ["free", "4"]:
+            target_preset = "free-legion-dag"
+        elif choice in ["nvidia", "nim", "5"]:
+            target_preset = "nvidia-nim-dag"
+        elif choice in ["venice", "6"]:
+            target_preset = "venice-ai-dag"
+        elif choice in ["cline", "codex", "7"]:
             target_preset = "cline-pass-dag"
-        elif choice in ["flash", "4"]:
-            target_preset = "flash-orchestrator"
-        elif choice in ["auto", "5"]:
+        elif choice in ["auto", "8", "0"]:
             target_preset = "auto-discovered"
         else:
             target_preset = choice
@@ -157,7 +187,7 @@ def main():
 
     show_menu()
     try:
-        user_input = input("Enter selection [1-5, c, 0, or q]: ").strip().lower()
+        user_input = input("Enter selection [1-8, c, 0, or q]: ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
         sys.exit(0)

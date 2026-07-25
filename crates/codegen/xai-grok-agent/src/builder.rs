@@ -102,6 +102,7 @@ pub struct AgentBuilder {
     background_workflows_enabled: bool,
     ask_user_question_enabled: bool,
     subagent_toggle: HashMap<String, bool>,
+    subagent_models: HashMap<String, String>,
     task_model_slugs: Vec<String>,
     skills_config: crate::prompt::skills::SkillsConfig,
     /// Resolved vendor-compat config governing which vendor (`.claude`/`.cursor`)
@@ -242,6 +243,7 @@ impl AgentBuilder {
             background_workflows_enabled: false,
             ask_user_question_enabled: true,
             subagent_toggle: HashMap::new(),
+            subagent_models: HashMap::new(),
             task_model_slugs: Vec::new(),
             skills_config: Default::default(),
             compat: Default::default(),
@@ -579,6 +581,11 @@ impl AgentBuilder {
     /// and are accepted at spawn time.
     pub fn with_subagent_toggle(mut self, toggle: HashMap<String, bool>) -> Self {
         self.subagent_toggle = toggle;
+        self
+    }
+    /// Set per-subagent model ID mappings from `[subagents.models]`.
+    pub fn with_subagent_models(mut self, models: HashMap<String, String>) -> Self {
+        self.subagent_models = models;
         self
     }
     /// Set the resolved vendor-compat config. Threaded into both startup
@@ -1177,6 +1184,8 @@ impl AgentBuilder {
             ),
             is_non_interactive: self.is_non_interactive,
             system_prompt_label: self.system_prompt_label,
+            dag_mode_enabled: self.subagents_enabled,
+            subagent_models: self.subagent_models.clone(),
         };
         let system_prompt = prompt_context
             .render(&tool_bridge)
