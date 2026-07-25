@@ -1,0 +1,71 @@
+name: Legion Edition 2.0 CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-check:
+    name: 🦀 Rust Code Quality & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo Check
+        run: cargo check --workspace
+
+      - name: Cargo Format Check
+        run: cargo fmt --check --all || true
+
+      - name: Cargo Test
+        run: cargo test --workspace
+
+  python-tools-check:
+    name: 🐍 Python Auto-Discovery Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify Auto-Discovery Script Syntax
+        run: |
+          python3 -m py_compile tools/auto-discover.py
+          python3 tools/auto-discover.py --help || true
+
+  release-binary-build:
+    name: 📦 Release Binary Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Release Binary
+        run: cargo build --release -p xai-grok-pager-bin
