@@ -1,6 +1,6 @@
 #!/bin/bash
 # Legion Fork Launcher Script
-# Supports --hub / hub / --mode / -m flags for interactive flow menus
+# Supports: legion mode, legion --mode, legion hub, legion config, legion auto
 
 set -e
 
@@ -16,19 +16,27 @@ else
     TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools"
 fi
 
-# Check for --hub / hub flag
-if [ "$1" = "--hub" ] || [ "$1" = "hub" ]; then
-    shift
-    python3 "$TOOLS_DIR/legion-hub.py" "$@"
-    exit 0
-fi
-
-# Check for --mode / -m flag
-if [ "$1" = "--mode" ] || [ "$1" = "-m" ]; then
-    shift
-    python3 "$TOOLS_DIR/legion-mode.py" "$@"
-    exit 0
-fi
+# Flag & Subcommand Handler
+case "$1" in
+    mode|--mode|-m|-mode|modes)
+        shift
+        exec python3 "$TOOLS_DIR/legion-mode.py" "$@"
+        ;;
+    hub|--hub|-h|-hub|control)
+        shift
+        exec python3 "$TOOLS_DIR/legion-hub.py" "$@"
+        ;;
+    config|--config|-c|-config)
+        shift
+        exec python3 "$TOOLS_DIR/legion-config.py" "$@"
+        ;;
+    discover|--discover|auto|--auto|scan|--scan)
+        shift
+        python3 "$TOOLS_DIR/auto-discover.py" "$@"
+        "$TOOLS_DIR/switch-subagents.sh" auto-discovered
+        exit 0
+        ;;
+esac
 
 # Run Auto-Discovery on first run if auto-discovered.toml is missing
 if [ ! -f "$AUTO_PRESET" ]; then
