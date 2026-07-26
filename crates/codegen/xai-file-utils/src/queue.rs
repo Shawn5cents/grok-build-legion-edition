@@ -6423,7 +6423,7 @@ mod tests {
         let (drop_tmp, drop_sc) = make_pair(
             "bb_turn1_drop.tar.gz_2_0",
             chrono::Utc::now() - chrono::Duration::hours(3),
-            false,
+            true,
         );
         cleanup_queue_dir(&queue_dir, Duration::from_secs(2 * 3600), None);
         assert!(keep_tmp.exists(), "fresh-by-sidecar temp kept");

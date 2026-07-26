@@ -1026,6 +1026,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::OpenSettingsFocus { key } => dispatch_open_settings(app, Some(key)),
         Action::PrivacyBannerAccept => dispatch_privacy_banner_accept(app),
         Action::PrivacyBannerCustomize => dispatch_privacy_banner_customize(app),
+        Action::OpenConnectModal => super::settings::ui::dispatch_open_connect_modal(app),
         Action::OpenCommandPalette => dispatch_open_command_palette(app),
         Action::OpenHowtoGuides => dispatch_open_howto_guides(app),
         Action::OpenResetConfirm { key } => dispatch_open_reset_confirm(app, key),

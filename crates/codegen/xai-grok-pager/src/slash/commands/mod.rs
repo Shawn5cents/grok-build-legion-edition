@@ -11,6 +11,7 @@ pub mod cd;
 pub mod compact;
 pub mod compact_mode;
 pub mod config_agents;
+pub mod connect;
 pub mod context;
 pub mod copy;
 pub mod dashboard;
@@ -96,6 +97,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(screen_mode_switch::ScreenModeSwitchCommand::minimal()),
         Arc::new(screen_mode_switch::ScreenModeSwitchCommand::fullscreen()),
         Arc::new(model::ModelCommand),
+        Arc::new(connect::ConnectCommand),
         Arc::new(effort::EffortCommand),
         Arc::new(always_approve::AlwaysApproveCommand),
         Arc::new(auto::AutoCommand),
@@ -258,6 +260,7 @@ mod tests {
             "compact-mode",
             "config",
             "config-agents",
+            "connect",
             "context",
             "copy",
             "cost",

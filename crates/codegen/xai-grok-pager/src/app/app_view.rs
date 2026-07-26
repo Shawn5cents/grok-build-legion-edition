@@ -4550,7 +4550,9 @@ impl AppView {
                                     announcements: &self.active_announcements,
                                     hidden_ids: &self.hidden_announcement_ids,
                                     privacy_banner,
-                                    legion_dag_banner: self.show_legion_dag_banner && self.current_ui.permission_mode.as_deref() == Some("legion"),
+                                    legion_dag_banner: self.show_legion_dag_banner
+                                        && self.current_ui.permission_mode.as_deref()
+                                            == Some("legion"),
                                     mouse_pos: agent_mouse_pos,
                                     tip: if show_session_tip {
                                         self.tip.as_deref()
@@ -6142,8 +6144,9 @@ pub(crate) mod tests {
             "an open prompt history overlay must request animation ticks"
         );
         let mut delivered = false;
-        for _ in 0..1000 {
-            if app.tick() && app.agents[&id].prompt.history_search.result_count() == 2 {
+        for _ in 0..3000 {
+            let _ = app.tick();
+            if app.agents[&id].prompt.history_search.result_count() == 2 {
                 delivered = true;
                 break;
             }

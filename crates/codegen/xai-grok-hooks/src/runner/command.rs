@@ -969,7 +969,7 @@ mod tests {
         }
 
         // exit 0 if /dev/tty is inaccessible (DETACHED), exit 1 if accessible
-        let spec = make_shell_spec("exec 3>/dev/tty 2>/dev/null && exit 1 || exit 0");
+        let spec = make_shell_spec("(exec 3>/dev/tty) 2>/dev/null && exit 1 || exit 0");
         let envelope = make_envelope();
         let ctx = make_ctx();
 

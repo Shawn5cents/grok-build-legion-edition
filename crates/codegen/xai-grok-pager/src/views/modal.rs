@@ -318,6 +318,10 @@ pub enum ActiveModal {
         /// different note's review modal.
         rewrite_nonce: u64,
     },
+    /// Interactive /connect modal for Cloud SaaS providers.
+    Connect {
+        state: Box<super::connect_modal::ConnectModalState>,
+    },
 }
 /// Snapshot of the command palette state, saved when opening an arg picker
 /// and restored on Esc.
@@ -637,7 +641,8 @@ impl ActiveModal {
             | ActiveModal::ShortcutsHelp { .. }
             | ActiveModal::MemoryBrowser { .. }
             | ActiveModal::Settings { .. }
-            | ActiveModal::RememberNoteReview { .. } => vec![],
+            | ActiveModal::RememberNoteReview { .. }
+            | ActiveModal::Connect { .. } => vec![],
         }
     }
     pub fn message(&self, drain_blocked: bool) -> &str {
@@ -668,6 +673,7 @@ impl ActiveModal {
             ActiveModal::Settings { .. } => crate::views::settings_modal::MODAL_TITLE,
             ActiveModal::ResetSettingsConfirm { .. } => "Reset setting?",
             ActiveModal::RememberNoteReview { .. } => "Memory Note",
+            ActiveModal::Connect { .. } => "Connect SaaS Provider",
         }
     }
 }

@@ -927,6 +927,9 @@ pub(super) fn action_for_enum_commit(key: SettingKey, choice: &'static str) -> O
             "default" => Some(Action::SetPermissionMode(
                 crate::app::actions::PermissionModeKind::Default,
             )),
+            "legion" => Some(Action::SetPermissionMode(
+                crate::app::actions::PermissionModeKind::Legion,
+            )),
             _ => None,
         },
         "coding_data_sharing" => match choice {

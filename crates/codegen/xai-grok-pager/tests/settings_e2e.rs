@@ -3184,8 +3184,8 @@ fn pr6_permission_mode_choices_use_canonical_strings() {
     };
     assert_eq!(
         canonicals.len(),
-        4,
-        "permission_mode catalog must be exactly {{ask, auto, always-approve, default}} — adding a \
+        5,
+        "permission_mode catalog must be exactly {{ask, auto, always-approve, default, legion}} — adding a \
          choice requires updating action_for_enum_commit, apply_setting_rollback, \
          PermissionModeKind, AND load_permission_mode (PR 11 contract)",
     );
@@ -3574,6 +3574,7 @@ fn pr11_permission_mode_kind_canonical_strings_match_choices_catalog() {
         PermissionModeKind::Ask,
         PermissionModeKind::Auto,
         PermissionModeKind::AlwaysApprove,
+        PermissionModeKind::Legion,
     ] {
         assert!(
             catalog_canonicals.contains(kind.as_canonical()),
@@ -3583,9 +3584,9 @@ fn pr11_permission_mode_kind_canonical_strings_match_choices_catalog() {
     }
     assert_eq!(
         catalog_canonicals.len(),
-        4,
-        "catalog must be exactly {{ask, auto, always-approve, default}} — adding a fifth \
-         choice requires adding a PermissionModeKind variant AND updating action_for_enum_commit \
+        5,
+        "catalog must be exactly {{ask, auto, always-approve, default, legion}} — adding a \
+         choice requires updating action_for_enum_commit \
          + apply_setting_rollback + load_permission_mode + this test (PR 11 contract)",
     );
 }

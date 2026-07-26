@@ -605,6 +605,8 @@ pub enum Action {
     PrivacyBannerAccept,
     /// Welcome privacy banner Customize (ack + open settings on coding_data_sharing).
     PrivacyBannerCustomize,
+    /// Open the interactive /connect modal for Cloud SaaS providers.
+    OpenConnectModal,
     /// Open the command palette (`/help`). The keybinding path (Ctrl+P) opens it
     /// directly in `handle_agent_action`; this lets a slash command reach the
     /// same modal through dispatch.

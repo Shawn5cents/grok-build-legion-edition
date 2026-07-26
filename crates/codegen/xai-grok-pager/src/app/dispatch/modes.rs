@@ -487,7 +487,9 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
         PermissionModeKind::Auto => "\u{2713} Permission mode: Auto (classifier)".to_string(),
         PermissionModeKind::Ask => "\u{2713} Permission mode: Ask".to_string(),
         PermissionModeKind::Default => "\u{2713} Permission mode: Default".to_string(),
-        PermissionModeKind::Legion => "\u{2713} Permission mode: Legion Multi-Agent DAG".to_string(),
+        PermissionModeKind::Legion => {
+            "\u{2713} Permission mode: Legion Multi-Agent DAG".to_string()
+        }
     }
 }
 
@@ -660,9 +662,10 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
         // when it is untouched, i.e. Normal → Plan); see the push below.
         let in_plan = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
         let in_yolo = agent.session.is_yolo();
-        let persist_canonical: Option<&'static str> = match (in_plan, in_auto, in_yolo) {
+        let in_legion = app.current_ui.permission_mode.as_deref() == Some("legion");
+        let persist_canonical: Option<&'static str> = match (in_plan, in_auto, in_yolo, in_legion) {
             // Normal → Plan
-            (false, false, false) => {
+            (false, false, false, false) => {
                 agent.plan_mode_pending = Some(true);
                 agent.deferred_session_mode = Some(xai_grok_tools::types::SessionMode::Plan);
                 agent.show_mode_switch_banner("Plan");
@@ -671,7 +674,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             }
             // Plan → Auto (or Plan → Always-Approve when the auto feature is
             // gated off, matching the legacy Normal→Plan→Always-Approve cycle).
-            (true, false, false) => {
+            (true, false, false, false) => {
                 agent.plan_mode_pending = Some(false);
                 agent.deferred_session_mode = None;
                 if auto_gate {
@@ -702,7 +705,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 }
             }
             // Auto → Always-Approve (or Normal if pinned)
-            (false, true, false) => {
+            (false, true, false, false) => {
                 if let Some(warning) = yolo_locked {
                     app.current_ui.permission_mode = Some("ask".into());
                     agent.session.yolo_mode = false;
@@ -721,7 +724,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 }
             }
             // Always-Approve → Legion Multi-Agent DAG
-            (false, _, true) => {
+            (false, _, true, false) => {
                 agent.session.yolo_mode = false;
                 app.default_yolo = false;
                 app.current_ui.permission_mode = Some("legion".into());
@@ -729,12 +732,21 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 tracing::info!("Mode cycle (pre-session): Always-Approve → Legion Multi-Agent DAG");
                 Some("legion")
             }
+            // Legion Multi-Agent DAG → Normal
+            (false, _, _, true) => {
+                agent.session.yolo_mode = false;
+                app.default_yolo = false;
+                app.current_ui.permission_mode = Some("ask".into());
+                agent.show_mode_switch_banner("Normal");
+                tracing::info!("Mode cycle (pre-session): Legion → Normal");
+                Some("ask")
+            }
             // Plan + Auto → Auto (exit plan, keep the classifier), matching the
             // with-session `(true, true, false, …)` arm. Every other plan+weird
             // state (notably Plan+yolo) resets to Normal, matching the
             // with-session catch-all — both paths MUST agree on the same input.
             // Clear stale yolo so enforcement matches the displayed mode.
-            (true, _, _) => {
+            (true, _, _, _) => {
                 agent.plan_mode_pending = Some(false);
                 agent.deferred_session_mode = None;
                 agent.session.yolo_mode = false;
@@ -774,10 +786,11 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
     // Effective plan state: prefer optimistic pending over confirmed active.
     let in_plan = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
     let in_yolo = agent.session.is_yolo();
+    let in_legion = app.current_ui.permission_mode.as_deref() == Some("legion");
 
-    match (in_plan, in_auto, in_yolo) {
+    match (in_plan, in_auto, in_yolo, in_legion) {
         // Normal → Plan
-        (false, false, false) => {
+        (false, false, false, false) => {
             agent.plan_mode_pending = Some(true);
             agent.show_mode_switch_banner("Plan");
             refresh_open_settings_modals(app);
@@ -790,7 +803,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
         // Plan → Auto (classifier mode; exit plan, not always-approve).
         // When the auto feature is gated off, Plan → Always-Approve (skip Auto),
         // matching the legacy cycle and respecting the yolo policy pin.
-        (true, false, false) => {
+        (true, false, false, false) => {
             agent.plan_mode_pending = Some(false);
             if !auto_gate {
                 if let Some(warning) = yolo_locked {
@@ -862,7 +875,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             ]
         }
         // Auto → Always-Approve (or Normal when policy pins yolo off)
-        (false, true, false) => {
+        (false, true, false, false) => {
             if let Some(warning) = yolo_locked {
                 set_yolo_mode_inner(app, false);
                 app.current_ui.permission_mode = Some("ask".into());
@@ -892,7 +905,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             }]
         }
         // Always-Approve → Legion Multi-Agent DAG Mode
-        (false, _, true) => {
+        (false, _, true, false) => {
             set_yolo_mode_inner(app, false);
             app.current_ui.permission_mode = Some("legion".into());
             refresh_open_settings_modals(app);
@@ -906,10 +919,26 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 persist: crate::app::actions::PermissionModePersist::BestEffort,
             }]
         }
+        // Legion Multi-Agent DAG Mode → Normal
+        (false, _, _, true) => {
+            agent.plan_mode_pending = Some(false);
+            set_yolo_mode_inner(app, false);
+            app.current_ui.permission_mode = Some("ask".into());
+            refresh_open_settings_modals(app);
+            if let Some(a) = app.agents.get_mut(&id) {
+                a.show_mode_switch_banner("Normal");
+            }
+            tracing::info!("Mode cycle: Legion → Normal");
+            vec![Effect::PersistPermissionMode {
+                canonical: "ask",
+                session_id: Some(session_id),
+                persist: crate::app::actions::PermissionModePersist::BestEffort,
+            }]
+        }
 
         // Plan + Auto → Auto: exit plan but keep the classifier. Without this
         // explicit arm the state falls to `_` and would reset to Normal/ask.
-        (true, true, false) => {
+        (true, true, false, false) => {
             agent.plan_mode_pending = Some(false);
             app.current_ui.permission_mode = Some("auto".into());
             refresh_open_settings_modals(app);

@@ -548,7 +548,7 @@
             .as_deref()
             .expect("applier always writes a display mode");
         assert!(
-            matches!(display, "ask" | "auto" | "always-approve" | "default"),
+            matches!(display, "ask" | "auto" | "always-approve" | "default" | "legion"),
             "soft push must rewrite the sentinel display via the applier, got {display:?}"
         );
         assert!(

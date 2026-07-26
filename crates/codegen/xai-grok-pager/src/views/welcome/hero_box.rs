@@ -28,7 +28,8 @@ const LOGO_H_PAD: u16 = 3;
 /// message never paints over the button.
 const UPGRADE_CTA_ROWS: u16 = 2;
 
-const HERO_SUBTITLE: &str = "Grok Build Beta Legion Edition — Heterogeneous Multi-Agent Architecture";
+const HERO_SUBTITLE: &str =
+    "Grok Build Beta Legion Edition — Heterogeneous Multi-Agent Architecture";
 
 use super::{PROMPT_HEIGHT, VERSION_GAP};
 

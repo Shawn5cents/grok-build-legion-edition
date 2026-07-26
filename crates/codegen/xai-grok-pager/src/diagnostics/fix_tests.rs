@@ -1056,13 +1056,13 @@ fn shell_aliases_expand_to_exact_argv_and_bypass_is_explicit() {
         let rc = temp.path().join("bashrc");
         std::fs::write(&rc, "alias ssh='grok wrap ssh'\n").unwrap();
         let command = format!(
-            "source '{}'; source '{}'; eval 'ssh -p 2222 host'",
+            "shopt -s expand_aliases; source '{}'; source '{}'; eval 'ssh -p 2222 host'",
             rc.display(),
             rc.display()
         );
         let mut shell = std::process::Command::new(bash);
         shell
-            .args(["-ic", &command])
+            .args(["--norc", "--noprofile", "-ic", &command])
             .env(
                 "PATH",
                 format!(

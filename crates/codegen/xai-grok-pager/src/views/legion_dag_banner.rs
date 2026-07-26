@@ -43,16 +43,23 @@ impl Widget for LegionDagBanner<'_> {
 
         let theme = Theme::current();
         let border_style = Style::default().fg(theme.accent_plan);
-        let title_style = Style::default().fg(theme.accent_user).add_modifier(Modifier::BOLD);
+        let title_style = Style::default()
+            .fg(theme.accent_user)
+            .add_modifier(Modifier::BOLD);
         let arrow_style = Style::default().fg(theme.gray);
-        let label_style = Style::default().fg(theme.text_primary).add_modifier(Modifier::BOLD);
+        let label_style = Style::default()
+            .fg(theme.text_primary)
+            .add_modifier(Modifier::BOLD);
         let model_style = Style::default().fg(theme.accent_plan);
 
         // Draw top border line with title
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(border_style)
-            .title(Span::styled(" ⚔️ LEGION HETEROGENEOUS MULTI-AGENT DAG [Ctrl+B to hide] ", title_style));
+            .title(Span::styled(
+                " ⚔️ LEGION HETEROGENEOUS MULTI-AGENT DAG [Ctrl+B to hide] ",
+                title_style,
+            ));
         block.render(area, buf);
 
         let inner_y = area.y + 1;

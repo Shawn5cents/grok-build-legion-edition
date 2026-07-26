@@ -1269,9 +1269,11 @@ const SUBAGENT_TOOL_NAMING: xai_tool_types::SubagentToolNaming<'static> =
 /// `TemplateRenderer` to resolve at finalize time).
 fn builtin_tools_fragment(name: BuiltinAgentName) -> String {
     let subagent = match name {
-        BuiltinAgentName::GeneralPurpose => xai_tool_types::GENERAL_PURPOSE_SUBAGENT,
-        BuiltinAgentName::Explore => xai_tool_types::EXPLORE_SUBAGENT,
-        BuiltinAgentName::Plan => xai_tool_types::PLAN_SUBAGENT,
+        BuiltinAgentName::GeneralPurpose | BuiltinAgentName::Implementor => {
+            xai_tool_types::GENERAL_PURPOSE_SUBAGENT
+        }
+        BuiltinAgentName::Explore | BuiltinAgentName::Verifier => xai_tool_types::EXPLORE_SUBAGENT,
+        BuiltinAgentName::Plan | BuiltinAgentName::Architect => xai_tool_types::PLAN_SUBAGENT,
         _ => return String::new(),
     };
     subagent.render_tools(&SUBAGENT_TOOL_NAMING)

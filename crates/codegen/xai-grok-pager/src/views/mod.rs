@@ -6,6 +6,7 @@ pub mod announcements;
 pub mod block_viewer;
 pub mod btw_overlay;
 pub mod completion_dropdown;
+pub mod connect_modal;
 pub mod context_bar;
 pub mod credit_bar;
 pub mod dashboard;

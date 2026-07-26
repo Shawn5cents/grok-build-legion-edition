@@ -2322,7 +2322,7 @@ mod tests {
         let report = maybe_auto_gc(
             &db,
             &AutoGcOptions {
-                max_age_secs: 0,
+                max_age_secs: 10,
                 min_interval_secs: 0,
                 include_orphan_snapshots: false,
                 include_rebuild: true,

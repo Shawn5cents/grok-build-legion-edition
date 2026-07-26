@@ -257,6 +257,25 @@ impl AgentView {
             }
         }
 
+        if let ActiveModal::Connect { state } = modal {
+            match state.handle_key(key) {
+                crate::views::connect_modal::ConnectModalOutcome::Cancelled => {
+                    self.active_modal = None;
+                    return InputOutcome::Changed;
+                }
+                crate::views::connect_modal::ConnectModalOutcome::Confirmed { provider_id, discovered_models } => {
+                    for m in discovered_models {
+                        let id = agent_client_protocol::ModelId::new(std::sync::Arc::from(m.clone()));
+                        let info = agent_client_protocol::ModelInfo::new(id.clone(), format!("{provider_id}/{m}"));
+                        self.session.models.available.insert(id, info);
+                    }
+                    return InputOutcome::Changed;
+                }
+                crate::views::connect_modal::ConnectModalOutcome::Changed => return InputOutcome::Changed,
+                crate::views::connect_modal::ConnectModalOutcome::Unchanged => return InputOutcome::Unchanged,
+            }
+        }
+
         // DocViewer: route through ModalWindow chrome, then handle scroll.
         if let ActiveModal::DocViewer {
             window,
@@ -484,7 +503,8 @@ impl AgentView {
             | ActiveModal::MemoryBrowser { .. }
             | ActiveModal::Settings { .. }
             | ActiveModal::ResetSettingsConfirm { .. }
-            | ActiveModal::RememberNoteReview { .. } => unreachable!(),
+            | ActiveModal::RememberNoteReview { .. }
+            | ActiveModal::Connect { .. } => unreachable!(),
         }
     }
 
@@ -2355,6 +2375,11 @@ impl AgentView {
                 }
             } else if let modal::ActiveModal::MemoryBrowser { state: mem_state } = active_modal {
                 crate::views::memory_modal::render_memory_modal(buf, area, mem_state, compact);
+            } else if let modal::ActiveModal::Connect { state: connect_state } = active_modal {
+                let compact = self.scrollback.appearance().prompt.compact;
+                crate::views::connect_modal::render_connect_modal(
+                    buf, area, connect_state, &theme, compact,
+                );
             } else if let modal::ActiveModal::Settings {
                 state: settings_state,
             } = active_modal

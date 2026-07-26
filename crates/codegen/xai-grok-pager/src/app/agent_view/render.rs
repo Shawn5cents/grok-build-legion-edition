@@ -1297,7 +1297,10 @@ impl AgentView {
         }
         if banner.legion_dag_banner {
             let legion_style = Style::default().fg(theme.accent_plan).bg(theme.bg_base);
-            status.push("legion_dag", Line::from(Span::styled("⚔️ LEGION DAG [Ctrl+B]", legion_style)));
+            status.push(
+                "legion_dag",
+                Line::from(Span::styled("⚔️ LEGION DAG [Ctrl+B]", legion_style)),
+            );
         }
         if let Some(ref goal) = self.goal_state {
             let tick = self.tasks.tick_count() as usize;

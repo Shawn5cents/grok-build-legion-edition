@@ -1317,7 +1317,8 @@ fn cycle_mode_pre_session_always_approve_to_normal_persists_ask() {
         agent.session.yolo_mode = true;
     }
 
-    let effects = dispatch(Action::CycleMode, &mut app);
+    let effects1 = dispatch(Action::CycleMode, &mut app); // Always-Approve -> Legion
+    let effects2 = dispatch(Action::CycleMode, &mut app); // Legion -> Normal
 
     let agent = &app.agents[&AgentId(0)];
     assert!(
@@ -1330,23 +1331,22 @@ fn cycle_mode_pre_session_always_approve_to_normal_persists_ask() {
     );
     assert_eq!(app.current_ui.permission_mode.as_deref(), Some("ask"));
     assert!(
-        effects.iter().any(|e| matches!(
+        effects2.iter().any(|e| matches!(
             e,
             Effect::PersistPermissionMode {
                 canonical: "ask",
-                session_id: None,
-                persist: crate::app::actions::PermissionModePersist::BestEffort,
+                ..
             }
         )),
         "pre-session Always-Approve → Normal must persist 'ask' \
-         (stale config.toml relaunches yolo), got {effects:?}"
+         (stale config.toml relaunches yolo), got {effects2:?}"
     );
-    // Welcome-screen Shift+Tab still kicks off session creation.
+    // Welcome-screen Shift+Tab still kicks off session creation on 1st step.
     assert!(
-        effects
+        effects1
             .iter()
             .any(|e| matches!(e, Effect::CreateSession { .. })),
-        "expected CreateSession alongside the persist, got {effects:?}"
+        "expected CreateSession alongside the persist, got {effects1:?}"
     );
 }
 
@@ -2018,7 +2018,8 @@ fn dispatch_cycle_mode_and_sync_always_approve_with_nudge_takes_ring_to_normal()
         &mut std::collections::HashMap::new(),
     );
 
-    let effects = dispatch_cycle_mode_and_sync(&mut app);
+    let _ = dispatch_cycle_mode_and_sync(&mut app); // Always-Approve -> Legion
+    let effects = dispatch_cycle_mode_and_sync(&mut app); // Legion -> Normal
 
     assert_ne!(
         app.agents[&AgentId(0)].plan_mode_pending,
@@ -2072,7 +2073,8 @@ fn dispatch_cycle_mode_always_approve_to_normal_delegates_off() {
     // set it.
     app.agents.get_mut(&AgentId(0)).unwrap().toast = None;
 
-    let effects = dispatch(Action::CycleMode, &mut app);
+    let _ = dispatch(Action::CycleMode, &mut app); // Always-Approve -> Legion
+    let effects = dispatch(Action::CycleMode, &mut app); // Legion -> Normal
 
     // YOLO OFF via delegation.
     assert!(

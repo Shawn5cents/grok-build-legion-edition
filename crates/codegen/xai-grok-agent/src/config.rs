@@ -1602,7 +1602,9 @@ impl AgentDefinition {
     pub fn architect() -> Self {
         use crate::prompt::subagent_prompts;
         Self {
-            description: "Read-only architectural designer for system blueprints and implementation plans".to_string(),
+            description:
+                "Read-only architectural designer for system blueprints and implementation plans"
+                    .to_string(),
             tool_config: plan_toolset(),
             permission_mode: PermissionMode::Plan,
             prompt_body: Some(subagent_prompts::PLAN_PROMPT.to_string()),
@@ -1613,7 +1615,9 @@ impl AgentDefinition {
     /// Implementor subagent — full-permission code execution and editing.
     pub fn implementor() -> Self {
         Self {
-            description: "Full implementation worker for editing code, applying patches, and running builds".to_string(),
+            description:
+                "Full implementation worker for editing code, applying patches, and running builds"
+                    .to_string(),
             tool_config: default_grok_build_toolset(),
             permission_mode: PermissionMode::DontAsk,
             inherit_skills: true,
@@ -1853,6 +1857,9 @@ mod tests {
             | BuiltinAgentName::GeneralPurpose
             | BuiltinAgentName::Explore
             | BuiltinAgentName::Plan
+            | BuiltinAgentName::Architect
+            | BuiltinAgentName::Implementor
+            | BuiltinAgentName::Verifier
             | BuiltinAgentName::Opencode
             | BuiltinAgentName::BrowserUse => false,
         }
@@ -2537,10 +2544,13 @@ description: Test default tool config
     #[test]
     fn test_builtin_agent_name_subagent_variants() {
         let variants = BuiltinAgentName::subagent_variants();
-        assert_eq!(variants.len(), 3);
+        assert_eq!(variants.len(), 6);
         assert!(variants.contains(&BuiltinAgentName::GeneralPurpose));
         assert!(variants.contains(&BuiltinAgentName::Explore));
         assert!(variants.contains(&BuiltinAgentName::Plan));
+        assert!(variants.contains(&BuiltinAgentName::Architect));
+        assert!(variants.contains(&BuiltinAgentName::Implementor));
+        assert!(variants.contains(&BuiltinAgentName::Verifier));
     }
     #[test]
     fn test_all_builtins_have_inherit_model() {

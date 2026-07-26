@@ -142,6 +142,24 @@ pub(in crate::app::dispatch) fn dispatch_open_howto_guides(app: &mut AppView) ->
     vec![]
 }
 
+/// Open the Connect modal (`/connect`). Toggles closed if already open.
+pub(in crate::app::dispatch) fn dispatch_open_connect_modal(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::modal::ActiveModal;
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    if matches!(&agent.active_modal, Some(ActiveModal::Connect { .. })) {
+        agent.active_modal = None;
+        return vec![];
+    }
+    let state = Box::new(crate::views::connect_modal::ConnectModalState::new());
+    agent.active_modal = Some(ActiveModal::Connect { state });
+    vec![]
+}
+
 /// Open the settings modal. Reads the live `UiConfig` snapshot
 /// (sans-IO). Single-instance: `debug_assert!` catches routing bugs.
 ///

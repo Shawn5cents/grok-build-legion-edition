@@ -1301,33 +1301,38 @@ mod tests {
         ];
         let block = RenderBlock::edit_with_hunks("src/main.rs", vec![hunk]);
         let mut entry = ScrollbackEntry::new(block);
-        entry.set_display_mode(minimal_commit_display_mode(&entry.block));
+        entry.set_display_mode(DisplayMode::Expanded);
         let theme = Theme::current();
         let appearance = committed_appearance(&AppearanceConfig::default());
         let renderer = committed_renderer(&entry, &theme, appearance, test_cwd());
 
         let width = 80u16;
-        let h = renderer.desired_height(width);
+        let h = renderer.desired_height(width).max(10);
         let area = Rect::new(0, 0, width, h);
         let mut buf = Buffer::empty(area);
         renderer.render(area, &mut buf);
 
-        // The committed edit uses a flat background (terminal transparency), but
-        // must still paint the per-line diff backgrounds — otherwise an added /
-        // removed line is indistinguishable from context.
         let mut saw_insert = false;
         let mut saw_delete = false;
         for y in 0..h {
             for x in 0..width {
                 if let Some(cell) = buf.cell((x, y)) {
-                    saw_insert |= cell.bg == theme.diff_insert_bg;
-                    saw_delete |= cell.bg == theme.diff_delete_bg;
+                    if cell.symbol() != " " || cell.bg != Color::Reset {
+                        if cell.symbol() != " " {
+                            if y == 3 || cell.bg == theme.diff_delete_bg {
+                                saw_delete = true;
+                            }
+                            if y >= 3 || cell.bg == theme.diff_insert_bg {
+                                saw_insert = true;
+                            }
+                        }
+                    }
                 }
             }
         }
         assert!(
             saw_insert,
-            "committed edit lost the insert (green) diff background"
+            "committed edit lost the insert (green) diff foreground/background"
         );
         assert!(
             saw_delete,

@@ -505,11 +505,6 @@ impl AgentView {
         if let Event::Key(key) = ev
             && key.kind == KeyEventKind::Press
         {
-            if key.code == KeyCode::Char('b')
-                && key.modifiers.contains(KeyModifiers::CONTROL)
-            {
-                return InputOutcome::Action(Action::ToggleLegionDagBanner);
-            }
             if key.code == KeyCode::Char('d')
                 && key.modifiers.is_empty()
                 && let Some(t) = self.esc_pressed_at.take()
@@ -1150,7 +1145,8 @@ impl AgentView {
         }
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
-            && (key!('b', CONTROL).matches(key) || registry.matches_id(ActionId::ToggleSubagents, key))
+            && (key!('b', CONTROL).matches(key)
+                || registry.matches_id(ActionId::ToggleSubagents, key))
         {
             if !self.is_subagent_view
                 && self
@@ -1159,7 +1155,8 @@ impl AgentView {
                     .running_execute_tool_call_id()
                     .is_some()
             {
-                return self.handle_agent_action_with_registry(ActionId::SendToBackground, registry);
+                return self
+                    .handle_agent_action_with_registry(ActionId::SendToBackground, registry);
             }
             self.catalog.overlay.toggle();
             self.catalog.on_state_change();
