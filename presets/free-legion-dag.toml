@@ -1,0 +1,38 @@
+[preset]
+required_env = ["ZENMUX_API_KEY", "OPENROUTER_API_KEY"]
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "zenmux/anthropic/claude-sonnet-5-free"
+explore = "openrouter/free"
+architect = "zenmux/anthropic/claude-sonnet-5-free"
+implementor = "zenmux/moonshotai/kimi-k3-free"
+verifier = "openrouter/free"
+plan = "zenmux/anthropic/claude-sonnet-5-free"
+general-purpose = "zenmux/moonshotai/kimi-k3-free"
+
+[subagents.fallback]
+verifier = "openrouter/free"
+
+[model."zenmux/anthropic/claude-sonnet-5-free"]
+model = "anthropic/claude-sonnet-5-free"
+base_url = "https://zenmux.ai/api/v1"
+name = "Claude Sonnet Free (ZenMux)"
+env_key = "ZENMUX_API_KEY"
+context_window = 200000
+
+[model."zenmux/moonshotai/kimi-k3-free"]
+model = "moonshotai/kimi-k3-free"
+base_url = "https://zenmux.ai/api/v1"
+name = "Kimi Free (ZenMux)"
+env_key = "ZENMUX_API_KEY"
+context_window = 1000000
+
+[model."openrouter/free"]
+model = "openrouter/free"
+base_url = "https://openrouter.ai/api/v1"
+name = "OpenRouter Free Router"
+env_key = "OPENROUTER_API_KEY"
+context_window = 200000

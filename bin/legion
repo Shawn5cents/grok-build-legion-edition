@@ -1,63 +1,107 @@
-#!/bin/bash
-# Legion Fork Launcher Script
-# Supports: legion mode, legion --mode, legion hub, legion config, legion auto
+#!/usr/bin/env bash
+# Legion launcher and control-tool dispatcher.
 
-set -e
+set -euo pipefail
 
-HOME_DIR="$HOME"
-REPO_DIR="$HOME/Desktop/grok-build-legion-edition/grok-build-legion-edition-main"
-PRESETS_DIR="$HOME_DIR/.grok/config-presets"
-AUTO_PRESET="$PRESETS_DIR/auto-discovered.toml"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd || true)"
+GROK_CONFIG_HOME="${GROK_HOME:-$HOME/.grok}"
+AUTO_PRESET="$GROK_CONFIG_HOME/config-presets/auto-discovered.toml"
+CONFIG_FILE="$GROK_CONFIG_HOME/config.toml"
 
-# Resolve tools directory
-if [ -d "$REPO_DIR/tools" ]; then
-    TOOLS_DIR="$REPO_DIR/tools"
-else
-    TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools"
-fi
+resolve_tools_dir() {
+    local candidate
+    for candidate in \
+        "${LEGION_TOOLS_DIR:-}" \
+        "${LEGION_SHARE_DIR:+$LEGION_SHARE_DIR/tools}" \
+        "$SCRIPT_DIR/.legion-tools" \
+        "$SCRIPT_DIR/../share/legion/tools" \
+        "$REPO_DIR/tools"
+    do
+        if [ -n "$candidate" ] && [ -f "$candidate/auto-discover.py" ]; then
+            (cd -- "$candidate" && pwd)
+            return 0
+        fi
+    done
+    return 1
+}
 
-# Flag & Subcommand Handler
-case "$1" in
-    mode|--mode|-m|-mode|modes)
+TOOLS_DIR="$(resolve_tools_dir || true)"
+SKIP_DISCOVERY=0
+
+usage() {
+    cat <<'EOF'
+Usage: legion [CONTROL COMMAND] [ARGS...]
+       legion [AGENT OPTIONS...]
+
+Control commands:
+  hub                 Open the interactive Legion control hub
+  mode [PRESET]       Select or apply a DAG preset
+  config              Edit model assignments for individual roles
+  discover            Detect usable providers and activate the generated preset
+  help                Show this help
+
+All other arguments are passed to the Grok Build agent runtime.
+EOF
+}
+
+require_tools() {
+    if [ -z "$TOOLS_DIR" ]; then
+        echo "Error: Legion control tools are not installed." >&2
+        echo "Re-run install.sh, or set LEGION_TOOLS_DIR to the tools directory." >&2
+        exit 1
+    fi
+}
+
+case "${1:-}" in
+    help|--help|-h)
+        usage
+        exit 0
+        ;;
+    mode|--mode|-m|modes)
+        require_tools
         shift
         exec python3 "$TOOLS_DIR/legion-mode.py" "$@"
         ;;
-    hub|--hub|-h|-hub|control)
+    hub|--hub|control)
+        require_tools
         shift
         exec python3 "$TOOLS_DIR/legion-hub.py" "$@"
         ;;
-    config|--config|-c|-config)
+    config|--config|-c)
+        require_tools
         shift
         exec python3 "$TOOLS_DIR/legion-config.py" "$@"
         ;;
     discover|--discover|auto|--auto|scan|--scan)
+        require_tools
         shift
-        python3 "$TOOLS_DIR/auto-discover.py" "$@"
-        "$TOOLS_DIR/switch-subagents.sh" auto-discovered
-        exit 0
+        exec python3 "$TOOLS_DIR/auto-discover.py" --activate "$@"
+        ;;
+    --version|-V)
+        SKIP_DISCOVERY=1
         ;;
 esac
 
-# Run Auto-Discovery on first run if auto-discovered.toml is missing
-if [ ! -f "$AUTO_PRESET" ]; then
-    echo "========================================================"
-    echo "🚀 First Run Detected on Legion Fork!"
-    echo "Running Zero-Touch Provider & Model Auto-Discovery..."
-    echo "========================================================"
-    python3 "$TOOLS_DIR/auto-discover.py"
-    "$TOOLS_DIR/switch-subagents.sh" auto-discovered
-    echo ""
+if [ "$SKIP_DISCOVERY" = "0" ] && [ ! -f "$AUTO_PRESET" ] && [ ! -f "$CONFIG_FILE" ]; then
+    require_tools
+    echo "First run: discovering available Legion providers..."
+    python3 "$TOOLS_DIR/auto-discover.py" --activate
+    echo
 fi
 
-# Locate compiled binary (xai-grok-pager or xai-grok-pager-bin)
-if [ -f "$HOME_DIR/.local/bin/xai-grok-pager" ]; then
-    exec "$HOME_DIR/.local/bin/xai-grok-pager" "$@"
-elif [ -f "$REPO_DIR/target/release/xai-grok-pager" ]; then
+if [ -n "${LEGION_BINARY:-}" ] && [ -x "$LEGION_BINARY" ]; then
+    exec "$LEGION_BINARY" "$@"
+elif [ -x "$SCRIPT_DIR/xai-grok-pager" ]; then
+    exec "$SCRIPT_DIR/xai-grok-pager" "$@"
+elif [ -n "$REPO_DIR" ] && [ -x "$REPO_DIR/target/release/xai-grok-pager" ]; then
     exec "$REPO_DIR/target/release/xai-grok-pager" "$@"
-elif [ -f "$REPO_DIR/target/release/xai-grok-pager-bin" ]; then
-    exec "$REPO_DIR/target/release/xai-grok-pager-bin" "$@"
+elif [ -n "$REPO_DIR" ] && [ -f "$REPO_DIR/Cargo.toml" ]; then
+    echo "Building the Legion release binary..."
+    (cd -- "$REPO_DIR" && cargo build --release -p xai-grok-pager-bin)
+    exec "$REPO_DIR/target/release/xai-grok-pager" "$@"
 else
-    echo "Building release binary..."
-    cd "$REPO_DIR" && cargo build --release -p xai-grok-pager-bin
-    exec "$REPO_DIR/target/release/xai-grok-pager" "$@"
+    echo "Error: xai-grok-pager is not installed." >&2
+    echo "Re-run install.sh or set LEGION_BINARY to the compiled executable." >&2
+    exit 1
 fi

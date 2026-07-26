@@ -1,0 +1,38 @@
+[preset]
+required_env = ["VENICE_API_KEY"]
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "venice/hermes-3-llama-3.1-405b"
+explore = "venice/deepseek-r1"
+architect = "venice/hermes-3-llama-3.1-405b"
+implementor = "venice/qwen-2.5-coder-32b"
+verifier = "venice/deepseek-r1"
+plan = "venice/hermes-3-llama-3.1-405b"
+general-purpose = "venice/qwen-2.5-coder-32b"
+
+[subagents.fallback]
+verifier = "venice/hermes-3-llama-3.1-405b"
+
+[model."venice/hermes-3-llama-3.1-405b"]
+model = "hermes-3-llama-3.1-405b"
+base_url = "https://api.venice.ai/api/v1"
+name = "Hermes 3 405B (Venice)"
+env_key = "VENICE_API_KEY"
+context_window = 128000
+
+[model."venice/deepseek-r1"]
+model = "deepseek-r1"
+base_url = "https://api.venice.ai/api/v1"
+name = "DeepSeek R1 (Venice)"
+env_key = "VENICE_API_KEY"
+context_window = 128000
+
+[model."venice/qwen-2.5-coder-32b"]
+model = "qwen-2.5-coder-32b"
+base_url = "https://api.venice.ai/api/v1"
+name = "Qwen Coder (Venice)"
+env_key = "VENICE_API_KEY"
+context_window = 128000

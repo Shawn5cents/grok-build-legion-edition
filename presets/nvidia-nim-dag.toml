@@ -1,0 +1,38 @@
+[preset]
+required_env = ["NVIDIA_API_KEY"]
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+explore = "nvidia/meta/llama-3.3-70b-instruct"
+architect = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+implementor = "nvidia/meta/llama-3.3-70b-instruct"
+verifier = "nvidia/deepseek-ai/deepseek-v4-pro"
+plan = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+general-purpose = "nvidia/meta/llama-3.3-70b-instruct"
+
+[subagents.fallback]
+verifier = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+
+[model."nvidia/nvidia/nemotron-3-ultra-550b-a55b"]
+model = "nvidia/nemotron-3-ultra-550b-a55b"
+base_url = "https://integrate.api.nvidia.com/v1"
+name = "Nemotron Ultra (NVIDIA NIM)"
+env_key = ["NVIDIA_API_KEY", "NVAPI_KEY"]
+context_window = 128000
+
+[model."nvidia/meta/llama-3.3-70b-instruct"]
+model = "meta/llama-3.3-70b-instruct"
+base_url = "https://integrate.api.nvidia.com/v1"
+name = "Llama 3.3 70B (NVIDIA NIM)"
+env_key = ["NVIDIA_API_KEY", "NVAPI_KEY"]
+context_window = 128000
+
+[model."nvidia/deepseek-ai/deepseek-v4-pro"]
+model = "deepseek-ai/deepseek-v4-pro"
+base_url = "https://integrate.api.nvidia.com/v1"
+name = "DeepSeek V4 Pro (NVIDIA NIM)"
+env_key = ["NVIDIA_API_KEY", "NVAPI_KEY"]
+context_window = 1000000

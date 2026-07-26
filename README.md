@@ -45,8 +45,8 @@ Legion decouples agent roles from specific vendor lock-in:
 
 - **Bring Any Model**: OpenCode Big Pickle (`opencode/big-pickle`), NVIDIA NIM (`nvidia/nemotron-3-ultra-550b`), Venice AI (`venice/hermes-3-llama-3.1-405b`), DeepSeek V4 Pro/Flash, Anthropic Claude 5 Sonnet/Opus, OpenAI GPT-5.6 Sol/Terra & Codex, Google Gemini 3.6 Flash, xAI Grok 4.5, MiniMax-M3, Qwen 3.7 Max, Moonshot Kimi K3, 100% Free Tier models, or local Ollama models.
 - **Bring Any Gateway or Provider**: OpenCode Go (`http://localhost:4096`), NVIDIA NIM (`https://integrate.api.nvidia.com/v1`), Venice AI (`https://api.venice.ai/api/v1`), OpenRouter, ZenMux, Kilo Code, Cline Pass, CLIProxyAPI, LiteLLM, vLLM, local HTTP proxies, or direct SaaS API endpoints.
-- **Bring Any CLI Tool**: Automatically detects and leverages `opencode`, `ollama`, `codex`, `cline`, `agy`, `legion`, `python3`, `go`, and local binaries installed on your system.
-- **100% Upstream Git Hygiene**: Zero core engine modifications required — preserves 100% clean `git pull upstream main` compatibility.
+- **Bring Any CLI Tool**: Reports installed AI clients and configures models only when it finds a provider credential or a reachable OpenAI-compatible local service, avoiding unusable role assignments.
+- **Upstream-Friendly Integration**: Legion-specific runtime changes stay focused on provider connection and subagent configuration paths to keep upstream updates straightforward.
 
 ---
 
@@ -96,7 +96,8 @@ Legion ships with intuitive interactive tools so you can configure models and pr
 | **`legion-hub`** *(or `legion hub`)* | **Ultimate Visual Control Panel**: Browse model catalog by context window, assign models to roles (`architect`, `implementor`), select presets, view live DAG topology, and launch sessions. |
 | **`legion-mode`** *(or `legion --mode`)* | **Preset Profile Switcher**: Instantly switch between profiles (`Legion DAG`, `Big Pickle DAG`, `Free Legion DAG`, `NVIDIA NIM DAG`, `Venice AI DAG`, `Cline/Codex`, `Auto-Discovered`) or run `legion-mode create` to build a custom preset. |
 | **`legion-config`** | **Model & Role Editor**: Interactively change models for individual subagent roles or apply **one single LLM to ALL roles at once** (`legion-config --all <model>`). |
-| **`./tools/auto-discover.py`** | **Zero-Touch Capability Scan**: Automatically scans system API keys (`OPENCODE`, `NVIDIA`, `VENICE`, `DEEPSEEK`, `ANTHROPIC`, `XAI`, `OPENROUTER`, `ZENMUX`, `KIMI`), local binaries (`opencode`, `ollama`, `codex`, `cline`, `agy`), and running endpoints to generate a tailored profile. |
+| **`./tools/auto-discover.py`** | **Zero-Touch Capability Scan**: Detects supported provider credentials (`OPENCODE`, `NVIDIA`, `VENICE`, `DEEPSEEK`, `ANTHROPIC`, `XAI`, `OPENAI`, `GEMINI`, `OPENROUTER`, `ZENMUX`, `KIMI`), reports installed AI clients, and probes local model endpoints to generate a routable profile. |
+| **`/connect`** *(inside Legion)* | **Provider Connection Flow**: Validate a provider key without freezing the TUI, discover its models, and add provider-qualified runtime model entries that hot-reload automatically. |
 
 ---
 
@@ -110,6 +111,12 @@ cd grok-build-legion-edition
 ./install.sh
 ```
 
+The installer builds the runtime, installs the complete control-tool bundle and
+built-in presets under `~/.local`, generates an auto-discovered profile on first
+install, and keeps provider-bearing config files private. Reinstalling preserves
+the active configuration. Set `GROK_HOME` to use a different configuration
+directory.
+
 ### 2. Launch an Interactive Session
 
 ```bash
@@ -121,6 +128,13 @@ legion
 ```bash
 legion-hub
 ```
+
+For command help, run `legion --help`, `legion-mode --help`,
+`legion-config --help`, or `legion-hub --help`.
+
+The role editor and Hub list only built-in or currently configured model
+routes, so choosing a model also gives the runtime an endpoint and credential
+source. Use the custom-model option after adding your own `[model.*]` entry.
 
 ---
 

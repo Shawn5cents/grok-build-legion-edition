@@ -234,6 +234,11 @@ impl UserPromptBlock {
         let mut prefix_style = theme.fg(prefix_color);
         let mut text_style = theme.fg(theme.text_primary);
         let mut skill_style = theme.fg(theme.accent_skill);
+        // Preserve the semantic distinction when NO_COLOR or a limited
+        // terminal palette collapses the skill accent onto the body color.
+        if theme.accent_skill == theme.text_primary {
+            skill_style = skill_style.add_modifier(Modifier::UNDERLINED);
+        }
         if terminal_native {
             prefix_style = prefix_style.add_modifier(Modifier::BOLD);
             text_style = text_style.add_modifier(Modifier::BOLD);
@@ -704,7 +709,7 @@ mod tests {
             .content
             .spans
             .iter()
-            .filter(|s| s.style.fg == Some(theme.accent_skill))
+            .filter(|s| is_skill_span(s, &theme))
             .map(|s| s.content.as_ref())
             .collect();
         assert_eq!(teal, vec!["/commit", "/review"]);
@@ -721,7 +726,7 @@ mod tests {
         let theme = Theme::current();
         let line0 = &lines[0].content.spans;
         assert!(
-            line0.iter().all(|s| s.style.fg != Some(theme.accent_skill)),
+            line0.iter().all(|s| !is_skill_span(s, &theme)),
             "line 0 has no token"
         );
         let line1 = &lines[1].content.spans;
@@ -753,7 +758,7 @@ mod tests {
             .content
             .spans
             .iter()
-            .filter(|s| s.style.fg == Some(theme.accent_skill))
+            .filter(|s| is_skill_span(s, &theme))
             .map(|s| s.content.as_ref())
             .collect();
         assert_eq!(teal, vec!["/model"]);
@@ -770,11 +775,19 @@ mod tests {
 
     // --- Token styling across soft-wrap and collapsed truncation ---
 
+    fn is_skill_span(span: &Span<'_>, theme: &Theme) -> bool {
+        if theme.accent_skill == theme.text_primary {
+            span.style.add_modifier.contains(Modifier::UNDERLINED)
+        } else {
+            span.style.fg == Some(theme.accent_skill)
+        }
+    }
+
     /// Concatenated content of a line's skill-accent spans.
     fn teal_text(line: &Line, theme: &Theme) -> String {
         line.spans
             .iter()
-            .filter(|s| s.style.fg == Some(theme.accent_skill))
+            .filter(|s| is_skill_span(s, theme))
             .map(|s| s.content.as_ref())
             .collect()
     }

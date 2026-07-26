@@ -897,7 +897,7 @@ pub(super) fn dispatch_dashboard_change_location(app: &mut AppView, input: Strin
     app.cwd = path.clone();
     // Keep the git-repo flag in sync with the new cwd (it's otherwise only
     // computed at startup). Worktree dispatch reads it.
-    app.cwd_has_git_ancestor = path.ancestors().any(|p| p.join(".git").exists());
+    app.cwd_has_git_ancestor = crate::git_info::is_git_repository(&path);
     // Warm the per-cwd git cache the header / top bar read (keyed on the
     // new cwd) so the new branch + worktree label show on the next frame
     // instead of waiting for the first lazy refresh (no git spawn on the

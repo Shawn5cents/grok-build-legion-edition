@@ -263,16 +263,12 @@ impl AgentView {
                     self.active_modal = None;
                     return InputOutcome::Changed;
                 }
-                crate::views::connect_modal::ConnectModalOutcome::Confirmed { provider_id, discovered_models } => {
-                    for m in discovered_models {
-                        let id = agent_client_protocol::ModelId::new(std::sync::Arc::from(m.clone()));
-                        let info = agent_client_protocol::ModelInfo::new(id.clone(), format!("{provider_id}/{m}"));
-                        self.session.models.available.insert(id, info);
-                    }
+                crate::views::connect_modal::ConnectModalOutcome::Changed => {
                     return InputOutcome::Changed;
                 }
-                crate::views::connect_modal::ConnectModalOutcome::Changed => return InputOutcome::Changed,
-                crate::views::connect_modal::ConnectModalOutcome::Unchanged => return InputOutcome::Unchanged,
+                crate::views::connect_modal::ConnectModalOutcome::Unchanged => {
+                    return InputOutcome::Unchanged;
+                }
             }
         }
 
@@ -540,6 +536,12 @@ impl AgentView {
         }
         if let Some(ActiveModal::MemoryBrowser { state }) = self.active_modal.as_mut() {
             return crate::views::memory_modal::handle_memory_paste(state, text);
+        }
+        if let Some(ActiveModal::Connect { state }) = self.active_modal.as_mut() {
+            return match state.handle_paste(text) {
+                crate::views::connect_modal::ConnectModalOutcome::Changed => InputOutcome::Changed,
+                _ => InputOutcome::Unchanged,
+            };
         }
         let settings_outcome = match self.active_modal.as_mut() {
             Some(ActiveModal::Settings { state }) => Some(
@@ -1654,6 +1656,25 @@ impl AgentView {
             };
         }
 
+        if matches!(self.active_modal, Some(ActiveModal::Connect { .. })) {
+            let outcome = match &mut self.active_modal {
+                Some(ActiveModal::Connect { state }) => {
+                    state.handle_mouse(mouse.kind, mouse.column, mouse.row)
+                }
+                _ => unreachable!(),
+            };
+            return match outcome {
+                crate::views::connect_modal::ConnectModalOutcome::Cancelled => {
+                    self.active_modal = None;
+                    InputOutcome::Changed
+                }
+                crate::views::connect_modal::ConnectModalOutcome::Changed => InputOutcome::Changed,
+                crate::views::connect_modal::ConnectModalOutcome::Unchanged => {
+                    InputOutcome::Unchanged
+                }
+            };
+        }
+
         // Standard modal mouse handling (EditConfirm).
         match mouse.kind {
             MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
@@ -2375,10 +2396,17 @@ impl AgentView {
                 }
             } else if let modal::ActiveModal::MemoryBrowser { state: mem_state } = active_modal {
                 crate::views::memory_modal::render_memory_modal(buf, area, mem_state, compact);
-            } else if let modal::ActiveModal::Connect { state: connect_state } = active_modal {
+            } else if let modal::ActiveModal::Connect {
+                state: connect_state,
+            } = active_modal
+            {
                 let compact = self.scrollback.appearance().prompt.compact;
                 crate::views::connect_modal::render_connect_modal(
-                    buf, area, connect_state, &theme, compact,
+                    buf,
+                    area,
+                    connect_state,
+                    &theme,
+                    compact,
                 );
             } else if let modal::ActiveModal::Settings {
                 state: settings_state,
@@ -3046,7 +3074,6 @@ mod command_palette_vim_input_tests {
             let mut buf = Buffer::empty(area);
             agent.draw_active_modal(area, &mut buf, crate::theme::Theme::current(), false);
 
-            let theme = crate::theme::Theme::current();
             let search_bar = match agent.active_modal.as_ref() {
                 Some(ActiveModal::CommandPalette { state, .. }) => {
                     state
@@ -3063,8 +3090,8 @@ mod command_palette_vim_input_tests {
             for x in search_bar.x..search_bar.x + search_bar.width {
                 if let Some(cell) = buf.cell((x, y)) {
                     text.push_str(cell.symbol());
-                    // The cursor is an inverse-video cell (bg == text_primary).
-                    if cell.bg == theme.text_primary {
+                    // The cursor carries a theme-neutral reverse-video cue.
+                    if cell.modifier.contains(ratatui::style::Modifier::REVERSED) {
                         has_cursor = true;
                     }
                 }

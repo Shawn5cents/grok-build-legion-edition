@@ -2662,8 +2662,8 @@ fn picker_highlights_current_choice() {
     };
     assert_eq!(
         bg_at(4),
-        Some(theme.bg_visual),
-        "focused row must have bg_visual background"
+        Some(settings_list_row_bg(&theme, true, false)),
+        "focused row must use the selected-row background"
     );
     assert_eq!(
         bg_at(3),
@@ -6680,25 +6680,26 @@ fn max_thoughts_width_preview_title_styling_distinguishes_from_content() {
          got {:?}",
         content_cell.modifier,
     );
-    // Contrast assertion: regardless of the active palette,
-    // the raw / un-quantized theme tokens differ. We use the
-    // raw theme directly so this assertion survives `NO_COLOR`
-    // / 256-color quantization.
-    let raw_theme = match crate::theme::Theme::current_kind() {
-        crate::theme::ThemeKind::GrokNight => crate::theme::Theme::groknight(),
-        crate::theme::ThemeKind::TokyoNight => crate::theme::Theme::tokyonight(),
-        crate::theme::ThemeKind::GrokDay => crate::theme::Theme::grokday(),
-        crate::theme::ThemeKind::RosePineMoon => crate::theme::Theme::rosepine_moon(),
-        // Resolved via `Theme::current()` rather than a constructor
-        // because `theme::oscura` is a private module.
-        crate::theme::ThemeKind::OscuraMidnight => crate::theme::Theme::current(),
-        crate::theme::ThemeKind::Auto => crate::theme::Theme::groknight(),
-    };
-    assert_ne!(
-        raw_theme.bg_visual, raw_theme.bg_highlight,
-        "raw theme tokens bg_visual + bg_highlight must be distinct so the preview \
-         reads as a contained block with two-tone bg",
-    );
+    // Contrast assertion for color-capable terminals: the raw,
+    // unquantized theme tokens differ. Under NO_COLOR the
+    // underline above is the intentional theme-neutral cue.
+    if crate::theme::color_support::detect().has_color() {
+        let raw_theme = match crate::theme::Theme::current_kind() {
+            crate::theme::ThemeKind::GrokNight => crate::theme::Theme::groknight(),
+            crate::theme::ThemeKind::TokyoNight => crate::theme::Theme::tokyonight(),
+            crate::theme::ThemeKind::GrokDay => crate::theme::Theme::grokday(),
+            crate::theme::ThemeKind::RosePineMoon => crate::theme::Theme::rosepine_moon(),
+            // Resolved via `Theme::current()` rather than a constructor
+            // because `theme::oscura` is a private module.
+            crate::theme::ThemeKind::OscuraMidnight => crate::theme::Theme::current(),
+            crate::theme::ThemeKind::Auto => crate::theme::Theme::groknight(),
+        };
+        assert_ne!(
+            raw_theme.bg_visual, raw_theme.bg_highlight,
+            "raw theme tokens bg_visual + bg_highlight must be distinct so the preview \
+             reads as a contained block with two-tone bg",
+        );
+    }
 }
 
 /// Test 5: content rows wrap at the pending value — no

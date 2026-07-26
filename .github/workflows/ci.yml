@@ -30,7 +30,7 @@ jobs:
         run: cargo check --workspace
 
       - name: Cargo Format Check
-        run: cargo fmt --check --all || true
+        run: cargo fmt --check --all
 
       - name: Cargo Test
         run: cargo test --workspace
@@ -48,10 +48,16 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify Auto-Discovery Script Syntax
+      - name: Verify Legion Control Tools
         run: |
-          python3 -m py_compile tools/auto-discover.py
-          python3 tools/auto-discover.py --help || true
+          python3 -m py_compile tools/*.py tools/tests/*.py
+          python3 -m unittest discover -s tools/tests -v
+          python3 tools/auto-discover.py --help
+          python3 tools/legion-mode.py --help
+          python3 tools/legion-config.py --help
+          python3 tools/legion-hub.py --help
+          bash -n install.sh bin/legion tools/switch-subagents.sh
+          python3 -c 'import glob,tomllib; [tomllib.load(open(path, "rb")) for path in glob.glob("presets/*.toml")]'
 
   release-binary-build:
     name: 📦 Release Binary Build Verification

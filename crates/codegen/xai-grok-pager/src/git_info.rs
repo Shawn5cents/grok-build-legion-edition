@@ -8,6 +8,14 @@ use std::time::{Duration, Instant};
 use crate::host::HostOs;
 use crate::terminal::{TerminalName, terminal_context};
 
+/// Whether `cwd` belongs to a valid Git repository.
+///
+/// A plain `.git` existence check accepts incomplete directories and malformed
+/// worktree links, so worktree UI gates share libgit2's repository discovery.
+pub(crate) fn is_git_repository(cwd: &Path) -> bool {
+    git2::Repository::discover(cwd).is_ok_and(|repo| !repo.is_bare())
+}
+
 /// Per-cwd git cache — the single source of truth for every git display
 /// in the pager: the welcome top bar / dashboard header (process cwd),
 /// each agent's status bar, and the dashboard row subtitles. Keyed per
@@ -363,6 +371,21 @@ pub(crate) fn home_dir() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn git_repository_detection_rejects_an_empty_dot_git_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir(temp.path().join(".git")).unwrap();
+        assert!(!is_git_repository(temp.path()));
+
+        std::fs::remove_dir(temp.path().join(".git")).unwrap();
+        git2::Repository::init(temp.path()).unwrap();
+        assert!(is_git_repository(temp.path()));
+
+        let bare = tempfile::tempdir().unwrap();
+        git2::Repository::init_bare(bare.path()).unwrap();
+        assert!(!is_git_repository(bare.path()));
+    }
 
     /// `cwd_git_info_lazy` returns `None` for a non-repo path and never
     /// panics when called without a tokio runtime (no refresh spawns).

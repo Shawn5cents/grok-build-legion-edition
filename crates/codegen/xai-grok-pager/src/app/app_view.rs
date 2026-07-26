@@ -1376,7 +1376,7 @@ impl AppView {
             project_picker_disabled: false,
             cwd_has_git_ancestor: std::env::current_dir()
                 .ok()
-                .is_some_and(|c| c.ancestors().any(|p| p.join(".git").exists())),
+                .is_some_and(|cwd| crate::git_info::is_git_repository(&cwd)),
             acp_tx,
             bundle_state: BundleState::default(),
             scratch: ScratchBuffer::new(),
@@ -5090,6 +5090,11 @@ impl AppView {
         if let ActiveView::Agent(id) = self.active_view
             && let Some(agent) = self.agents.get_mut(&id)
         {
+            if let Some(crate::views::modal::ActiveModal::Connect { state }) =
+                agent.active_modal.as_mut()
+            {
+                needs_redraw |= state.tick();
+            }
             needs_redraw |= agent.scrollback.tick();
             needs_redraw |= agent.todo.list_state.tick();
             needs_redraw |= agent.todo.badge_tick();
@@ -5443,6 +5448,11 @@ impl AppView {
                     || agent.inline_video.as_ref().is_some_and(|v| !v.finished)
                     || agent.video_load_rx.is_some()
                     || agent.mermaid_needs_tick()
+                    || matches!(
+                        agent.active_modal.as_ref(),
+                        Some(crate::views::modal::ActiveModal::Connect { state })
+                            if state.needs_tick()
+                    )
                     || !agent.permission_queue.is_empty()
                     || matches!(
                         agent.active_modal.as_ref(),

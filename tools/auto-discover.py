@@ -1,278 +1,358 @@
 #!/usr/bin/env python3
-"""
-Zero-Touch Provider & Model Auto-Discovery for Legion Grok
+"""Discover usable Legion providers and generate a working DAG preset."""
 
-Auto-detects:
-1. Environment API keys (DEEPSEEK, OPENROUTER, MINIMAX, ANTHROPIC, ZENMUX, XAI, KIMI, CLINE, OPENAI, CODEX, KILO, AGY/ANTIGRAVITY, OPENCODE, NVIDIA, VENICE)
-2. Installed CLI AI binaries & tools (Ollama, OpenCode, LiteLLM, CLIProxyAPI, Horde, Legion, agy, codex, cline)
-3. Running local HTTP proxy & model endpoints (OpenCode:4096, CLIProxyAPI:8317, Ollama:11434, LiteLLM:4000, LMStudio:1234)
-4. Configured credentials in ~/.claude, ~/.gemini, ~/.cli-proxy-api, ~/.opencode, ~/.cline
+from __future__ import annotations
 
-Automatically populates ~/.grok/config.toml with discovered models and generates optimal DAG role mappings!
-"""
-
-import os
-import sys
+import argparse
 import json
+import os
 import shutil
-import urllib.request
+import sys
 import urllib.error
-import re
+import urllib.request
 from pathlib import Path
+from typing import Any
 
-HOME = Path.home()
-CONFIG_FILE = HOME / ".grok" / "config.toml"
-PRESETS_DIR = HOME / ".grok" / "config-presets"
+import legion_common as common
 
-# Key environment variable definitions including OpenCode, NVIDIA NIM, Venice AI, Cline, Codex, Kilo Code, and AGY
-KEY_MAP = {
-    "OPENCODE_API_KEY": {
-        "provider": "opencode",
+PROVIDERS = [
+    {
+        "id": "opencode",
+        "keys": ("OPENCODE_API_KEY",),
         "models": [
-            {"id": "opencode/big-pickle", "name": "Big Pickle (OpenCode Zen)", "url": "http://localhost:4096/v1", "ctx": 200000},
-            {"id": "opencode/deepseek-v4-flash-free", "name": "DeepSeek V4 Flash Free", "url": "http://localhost:4096/v1", "ctx": 1000000},
-        ]
+            ("opencode/big-pickle", "big-pickle", "OpenCode Big Pickle", 200_000),
+            (
+                "opencode/deepseek-v4-flash-free",
+                "deepseek-v4-flash-free",
+                "DeepSeek V4 Flash Free (OpenCode)",
+                1_000_000,
+            ),
+        ],
+        "endpoint": "https://api.opencode.ai/v1",
     },
-    "NVIDIA_API_KEY": {
-        "provider": "nvidia",
+    {
+        "id": "nvidia",
+        "keys": ("NVIDIA_API_KEY", "NVAPI_KEY"),
         "models": [
-            {"id": "nvidia/nvidia/nemotron-3-ultra-550b-a55b", "name": "Nemotron 550B (NIM)", "url": "https://integrate.api.nvidia.com/v1", "ctx": 128000},
-            {"id": "nvidia/deepseek-ai/deepseek-v4-pro", "name": "DeepSeek V4 Pro (NIM)", "url": "https://integrate.api.nvidia.com/v1", "ctx": 1000000},
-        ]
+            ("nvidia/nvidia/nemotron-3-ultra-550b-a55b", "nvidia/nemotron-3-ultra-550b-a55b", "Nemotron Ultra", 128_000),
+            ("nvidia/deepseek-ai/deepseek-v4-pro", "deepseek-ai/deepseek-v4-pro", "DeepSeek V4 Pro (NIM)", 1_000_000),
+        ],
+        "endpoint": "https://integrate.api.nvidia.com/v1",
     },
-    "NVAPI_KEY": {
-        "provider": "nvidia",
+    {
+        "id": "venice",
+        "keys": ("VENICE_API_KEY",),
         "models": [
-            {"id": "nvidia/nvidia/nemotron-3-ultra-550b-a55b", "name": "Nemotron 550B (NIM)", "url": "https://integrate.api.nvidia.com/v1", "ctx": 128000},
-        ]
+            ("venice/hermes-3-llama-3.1-405b", "hermes-3-llama-3.1-405b", "Hermes 3 405B (Venice)", 128_000),
+            ("venice/deepseek-r1", "deepseek-r1", "DeepSeek R1 (Venice)", 128_000),
+        ],
+        "endpoint": "https://api.venice.ai/api/v1",
     },
-    "VENICE_API_KEY": {
-        "provider": "venice",
+    {
+        "id": "deepseek",
+        "keys": ("DEEPSEEK_API_KEY",),
         "models": [
-            {"id": "venice/hermes-3-llama-3.1-405b", "name": "Hermes 3 Llama 405B (Venice)", "url": "https://api.venice.ai/api/v1", "ctx": 128000},
-            {"id": "venice/deepseek-r1", "name": "DeepSeek R1 (Venice Zero-Data)", "url": "https://api.venice.ai/api/v1", "ctx": 128000},
-        ]
+            ("deepseek-v4-pro", "deepseek-v4-pro", "DeepSeek V4 Pro", 1_000_000),
+            ("deepseek-v4-flash", "deepseek-v4-flash", "DeepSeek V4 Flash", 1_000_000),
+        ],
+        "endpoint": "https://api.deepseek.com/v1",
     },
-    "CLINE_API_KEY": {
-        "provider": "cline",
+    {
+        "id": "minimax",
+        "keys": ("MINIMAX_API_KEY",),
         "models": [
-            {"id": "cline-pass", "name": "Cline Pass Default", "url": "https://api.cline.bot/v1", "ctx": 200000},
-        ]
+            ("MiniMax-M3", "MiniMax-M3", "MiniMax M3", 1_000_000),
+        ],
+        "endpoint": "https://api.minimax.io/v1",
     },
-    "CLINE_PASS_KEY": {
-        "provider": "cline",
+    {
+        "id": "openrouter",
+        "keys": ("OPENROUTER_API_KEY",),
         "models": [
-            {"id": "cline-pass", "name": "Cline Pass Default", "url": "https://api.cline.bot/v1", "ctx": 200000},
-        ]
+            ("openrouter/auto", "openrouter/auto", "OpenRouter Auto", 200_000),
+            ("openrouter/deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-pro", "DeepSeek V4 Pro (OpenRouter)", 128_000),
+        ],
+        "endpoint": "https://openrouter.ai/api/v1",
     },
-    "DEEPSEEK_API_KEY": {
-        "provider": "deepseek",
+    {
+        "id": "anthropic",
+        "keys": ("ANTHROPIC_API_KEY",),
         "models": [
-            {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "url": "https://api.deepseek.com/v1", "ctx": 1000000},
-            {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "url": "https://api.deepseek.com/v1", "ctx": 1000000},
-        ]
+            ("claude-sonnet-5", "claude-sonnet-5", "Claude Sonnet 5", 200_000),
+        ],
+        "endpoint": "https://api.anthropic.com/v1",
+        "api_backend": "messages",
+        "auth_scheme": "x_api_key",
     },
-    "CODEX_API_KEY": {
-        "provider": "codex",
+    {
+        "id": "zenmux",
+        "keys": ("ZENMUX_API_KEY",),
         "models": [
-            {"id": "openai/gpt-5-codex", "name": "Codex Latest (gpt-5-codex)", "url": "http://localhost:8317/v1", "ctx": 128000},
-        ]
+            ("zenmux/z-ai/glm-5.2", "z-ai/glm-5.2", "GLM 5.2 (ZenMux)", 128_000),
+            ("zenmux/qwen/qwen3.7-plus", "qwen/qwen3.7-plus", "Qwen 3.7 Plus (ZenMux)", 128_000),
+        ],
+        "endpoint": "https://zenmux.ai/api/v1",
     },
-    "KILO_API_KEY": {
-        "provider": "kilocode",
+    {
+        "id": "xai",
+        "keys": ("XAI_API_KEY",),
         "models": [
-            {"id": "kilo-code", "name": "Kilo Code Default", "url": "http://localhost:8317/v1", "ctx": 200000},
-        ]
+            ("grok-4.5", "grok-4.5", "Grok 4.5", 500_000),
+        ],
+        "endpoint": "https://api.x.ai/v1",
     },
-    "AGY_API_KEY": {
-        "provider": "antigravity",
+    {
+        "id": "kimi",
+        "keys": ("KIMI_API_KEY",),
         "models": [
-            {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash (AGY)", "url": "https://generativelanguage.googleapis.com", "ctx": 1000000},
-            {"id": "gemini-3.1-pro", "name": "Gemini 3.1 Pro (AGY)", "url": "https://generativelanguage.googleapis.com", "ctx": 1000000},
-        ]
+            ("kimi-k3", "kimi-k3", "Kimi K3", 1_000_000),
+        ],
+        "endpoint": "https://api.moonshot.ai/v1",
     },
-    "ANTIGRAVITY_API_KEY": {
-        "provider": "antigravity",
+    {
+        "id": "openai",
+        "keys": ("OPENAI_API_KEY",),
         "models": [
-            {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash (AGY)", "url": "https://generativelanguage.googleapis.com", "ctx": 1000000},
-        ]
+            ("openai/gpt-5-codex", "gpt-5-codex", "OpenAI Codex", 128_000),
+        ],
+        "endpoint": "https://api.openai.com/v1",
+        "api_backend": "responses",
     },
-    "MINIMAX_API_KEY": {
-        "provider": "minimax",
+    {
+        "id": "gemini",
+        "keys": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
         "models": [
-            {"id": "MiniMax-M3", "name": "MiniMax-M3", "url": "https://api.minimax.io/v1", "ctx": 1000000},
-        ]
+            ("gemini-3.6-flash", "gemini-3.6-flash", "Gemini 3.6 Flash", 1_000_000),
+        ],
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai",
     },
-    "OPENROUTER_API_KEY": {
-        "provider": "openrouter",
-        "models": [
-            {"id": "openrouter/openrouter/auto", "name": "OpenRouter Auto Routing", "url": "https://openrouter.ai/api/v1", "ctx": 200000},
-            {"id": "openrouter/anthropic/claude-sonnet-5", "name": "Claude Sonnet 5 (OpenRouter)", "url": "https://openrouter.ai/api/v1", "ctx": 200000},
-            {"id": "openrouter/deepseek/deepseek-v4-pro", "name": "DeepSeek V4 Pro (OpenRouter)", "url": "https://openrouter.ai/api/v1", "ctx": 128000},
-        ]
-    },
-    "ANTHROPIC_API_KEY": {
-        "provider": "anthropic",
-        "models": [
-            {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "url": "https://api.anthropic.com/v1", "ctx": 200000, "backend": "messages"},
-        ]
-    },
-    "ZENMUX_API_KEY": {
-        "provider": "zenmux",
-        "models": [
-            {"id": "zenmux/z-ai/glm-5.2", "name": "GLM 5.2 (ZenMux)", "url": "https://zenmux.ai/api/v1", "ctx": 128000},
-            {"id": "zenmux/qwen/qwen3.7-plus", "name": "Qwen 3.7 Plus (ZenMux)", "url": "https://zenmux.ai/api/v1", "ctx": 128000},
-        ]
-    },
-    "XAI_API_KEY": {
-        "provider": "xai",
-        "models": [
-            {"id": "grok-4.5", "name": "Grok 4.5", "url": "https://api.x.ai/v1", "ctx": 500000},
-        ]
-    },
-    "KIMI_API_KEY": {
-        "provider": "kimi",
-        "models": [
-            {"id": "kimi-k3", "name": "Kimi K3 (Moonshot)", "url": "https://api.moonshot.cn/v1", "ctx": 1000000},
-        ]
-    }
-}
-
-HTTP_PROBES = [
-    {"name": "OpenCode Go / Server", "port": 4096, "url": "http://localhost:4096/v1"},
-    {"name": "CLIProxyAPI", "port": 8317, "url": "http://localhost:8317/v1"},
-    {"name": "Ollama Local", "port": 11434, "url": "http://localhost:11434/v1"},
-    {"name": "LiteLLM Proxy", "port": 4000, "url": "http://localhost:4000/v1"},
-    {"name": "LM Studio Local", "port": 1234, "url": "http://localhost:1234/v1"},
 ]
 
-def check_http_endpoint(endpoint):
-    url = f"{endpoint['url']}/models"
-    req = urllib.request.Request(url, headers={"User-Agent": "GrokAutoDiscover/1.0"})
+LOCAL_PROBES = [
+    ("opencode-local", "OpenCode local server", "http://127.0.0.1:4096/v1"),
+    ("cliproxy", "CLIProxyAPI", "http://127.0.0.1:8317/v1"),
+    ("ollama", "Ollama", "http://127.0.0.1:11434/v1"),
+    ("litellm", "LiteLLM", "http://127.0.0.1:4000/v1"),
+    ("lmstudio", "LM Studio", "http://127.0.0.1:1234/v1"),
+]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Detect provider environment keys and reachable local OpenAI-compatible "
+            "services, then generate auto-discovered.toml."
+        )
+    )
+    parser.add_argument(
+        "--no-probe",
+        action="store_true",
+        help="skip local HTTP endpoint probes",
+    )
+    parser.add_argument(
+        "--activate",
+        action="store_true",
+        help="also merge the generated preset into the active config.toml",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=1.0,
+        help="timeout in seconds for each local endpoint probe (default: 1.0)",
+    )
+    return parser.parse_args()
+
+
+def probe_models(endpoint: str, timeout: float) -> list[str] | None:
+    request = urllib.request.Request(
+        f"{endpoint.rstrip('/')}/models",
+        headers={"User-Agent": "LegionAutoDiscover/2.0"},
+    )
     try:
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode())
-                models = [m.get("id") for m in data.get("data", []) if "id" in m]
-                return True, models
-    except Exception:
-        pass
-    return False, []
+        with urllib.request.urlopen(request, timeout=max(0.1, timeout)) as response:
+            if response.status != 200:
+                return None
+            body = json.loads(response.read().decode("utf-8"))
+    except (OSError, ValueError, urllib.error.URLError):
+        return None
+    data = body.get("data", [])
+    if not isinstance(data, list):
+        return []
+    return [
+        str(item["id"])
+        for item in data
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    ]
 
-def main():
-    print("⚡ Auto-Discovering Installed Tools, Credentials, and Services...")
-    print("=" * 65)
 
-    discovered_keys = {}
-    for env_var, spec in KEY_MAP.items():
-        val = os.environ.get(env_var)
-        if val and len(val.strip()) > 0:
-            discovered_keys[env_var] = spec
-            print(f"  [✓] Environment API Key: {env_var}")
+def first_set(keys: tuple[str, ...]) -> str | None:
+    return next((key for key in keys if os.environ.get(key, "").strip()), None)
 
-    discovered_binaries = []
-    for bin_name in ["ollama", "opencode", "litellm", "legion", "horde", "agy", "codex", "cline", "go", "python3"]:
-        path = shutil.which(bin_name)
-        if path:
-            discovered_binaries.append((bin_name, path))
-            print(f"  [✓] Binary Installed: {bin_name} -> {path}")
 
-    # Config dir checks
-    for cfg_dir_name in [".cline", ".claude", ".gemini", ".opencode", ".cli-proxy-api"]:
-        dir_path = HOME / cfg_dir_name
-        if dir_path.exists():
-            print(f"  [✓] Configuration Directory: ~/{cfg_dir_name}")
+def model_entry(
+    *,
+    model: str,
+    endpoint: str,
+    name: str,
+    context_window: int,
+    env_keys: tuple[str, ...] = (),
+    api_backend: str | None = None,
+    auth_scheme: str | None = None,
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        "model": model,
+        "base_url": endpoint,
+        "name": name,
+        "context_window": context_window,
+    }
+    if env_keys:
+        entry["env_key"] = list(env_keys)
+    if api_backend:
+        entry["api_backend"] = api_backend
+    if auth_scheme:
+        entry["auth_scheme"] = auth_scheme
+    return entry
 
-    desktop_cliproxy = HOME / "Desktop" / "CLIProxyAPI-main"
-    if desktop_cliproxy.exists():
-        print(f"  [✓] Desktop Tool Found: CLIProxyAPI at {desktop_cliproxy}")
 
-    discovered_services = []
-    for probe in HTTP_PROBES:
-        alive, models = check_http_endpoint(probe)
-        if alive:
-            discovered_services.append((probe, models))
-            print(f"  [✓] Active HTTP Service: {probe['name']} (Port {probe['port']}) — {len(models)} models available")
+def build_preset(
+    provider_ids: set[str],
+    entries: dict[str, dict[str, Any]],
+    local_models: list[str],
+) -> tuple[str, dict[str, str]]:
+    roles = {role: "grok-4.5" for role in common.CANONICAL_ROLES}
 
-    # Optimal DAG Role Selection based on discovered capabilities
-    architect_model = "grok-4.5"
-    implementor_model = "grok-4.5"
-    explore_model = "grok-4.5"
-    orchestrator_model = "grok-4.5"
-    verifier_model = "grok-4.5"
+    if "gemini" in provider_ids:
+        roles["explore"] = "gemini-3.6-flash"
+    if "opencode" in provider_ids:
+        roles.update(
+            orchestrator="opencode/big-pickle",
+            explore="opencode/deepseek-v4-flash-free",
+            architect="opencode/big-pickle",
+            implementor="opencode/big-pickle",
+        )
+    if "openai" in provider_ids:
+        roles["implementor"] = "openai/gpt-5-codex"
+    if "openrouter" in provider_ids:
+        roles.update(
+            orchestrator="openrouter/auto",
+            architect="openrouter/auto",
+            implementor="openrouter/deepseek/deepseek-v4-pro",
+        )
+    if "deepseek" in provider_ids:
+        roles.update(
+            orchestrator="deepseek-v4-pro",
+            explore="deepseek-v4-flash",
+            architect="deepseek-v4-pro",
+            implementor="deepseek-v4-pro",
+        )
+    if "minimax" in provider_ids:
+        roles["implementor"] = "MiniMax-M3"
+    if "venice" in provider_ids:
+        roles["orchestrator"] = "venice/hermes-3-llama-3.1-405b"
+    if "nvidia" in provider_ids:
+        roles["architect"] = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+    if "anthropic" in provider_ids:
+        roles["orchestrator"] = "claude-sonnet-5"
+    if "xai" in provider_ids:
+        roles["verifier"] = "grok-4.5"
+    elif roles["verifier"] not in entries and local_models:
+        roles["verifier"] = local_models[0]
+    elif roles["verifier"] not in entries:
+        roles["verifier"] = roles["orchestrator"]
 
-    if "CLINE_API_KEY" in discovered_keys or "CLINE_PASS_KEY" in discovered_keys or shutil.which("cline") or (HOME / ".cline").exists():
-        orchestrator_model = "cline-pass"
-        architect_model = "cline-pass"
+    if not provider_ids and local_models:
+        for role in common.CANONICAL_ROLES:
+            roles[role] = local_models[0]
 
-    if "CODEX_API_KEY" in discovered_keys or shutil.which("codex"):
-        implementor_model = "openai/gpt-5-codex"
+    roles["plan"] = roles["architect"]
+    roles["general-purpose"] = roles["implementor"]
+    content = "# Auto-discovered by Legion. Re-run instead of hand-editing.\n\n"
+    content = common.replace_table(content, "subagents", {"enabled": True})
+    content = common.replace_table(content, "subagents.models", roles)
+    content = common.replace_table(
+        content,
+        "subagents.fallback",
+        {"verifier": roles["orchestrator"]},
+    )
+    content = common.merge_model_entries(content, entries)
+    return content, roles
 
-    if "OPENCODE_API_KEY" in discovered_keys or shutil.which("opencode"):
-        orchestrator_model = "opencode/big-pickle"
-        explore_model = "opencode/deepseek-v4-flash-free"
 
-    if "AGY_API_KEY" in discovered_keys or "ANTIGRAVITY_API_KEY" in discovered_keys or shutil.which("agy"):
-        if orchestrator_model == "grok-4.5":
-            orchestrator_model = "gemini-3.6-flash"
-        explore_model = "gemini-3.6-flash"
+def main() -> int:
+    args = parse_args()
+    print("⚡ Discovering usable Legion providers and local model services...")
+    print("=" * 68)
 
-    if "DEEPSEEK_API_KEY" in discovered_keys:
-        orchestrator_model = "deepseek-v4-pro"
-        architect_model = "deepseek-v4-pro"
-        explore_model = "deepseek-v4-flash"
-        implementor_model = "deepseek-v4-pro"
-    elif "OPENROUTER_API_KEY" in discovered_keys:
-        orchestrator_model = "openrouter/openrouter/auto"
-        architect_model = "openrouter/anthropic/claude-sonnet-5"
-        implementor_model = "openrouter/deepseek/deepseek-v4-pro"
+    provider_ids: set[str] = set()
+    entries: dict[str, dict[str, Any]] = {}
+    for provider in PROVIDERS:
+        selected_key = first_set(provider["keys"])
+        if selected_key is None:
+            continue
+        provider_ids.add(provider["id"])
+        print(f"  [✓] Provider credential: {selected_key}")
+        for catalog_id, model, name, context in provider["models"]:
+            entries[catalog_id] = model_entry(
+                model=model,
+                endpoint=provider["endpoint"],
+                name=name,
+                context_window=context,
+                env_keys=provider["keys"],
+                api_backend=provider.get("api_backend"),
+                auth_scheme=provider.get("auth_scheme"),
+            )
 
-    if "MINIMAX_API_KEY" in discovered_keys:
-        implementor_model = "MiniMax-M3"
+    binaries = [
+        name
+        for name in ("ollama", "opencode", "litellm", "agy", "codex", "cline")
+        if shutil.which(name)
+    ]
+    if binaries:
+        print("  [i] Installed clients: " + ", ".join(binaries))
 
-    if "VENICE_API_KEY" in discovered_keys:
-        orchestrator_model = "venice/hermes-3-llama-3.1-405b"
+    local_catalog_ids: list[str] = []
+    if not args.no_probe:
+        for provider_id, label, endpoint in LOCAL_PROBES:
+            models = probe_models(endpoint, args.timeout)
+            if models is None:
+                continue
+            print(f"  [✓] Local service: {label} ({len(models)} models)")
+            for model in models:
+                catalog_id = f"{provider_id}/{model}"
+                entries[catalog_id] = model_entry(
+                    model=model,
+                    endpoint=endpoint,
+                    name=f"{model} ({label})",
+                    context_window=200_000,
+                )
+                local_catalog_ids.append(catalog_id)
 
-    if "NVIDIA_API_KEY" in discovered_keys or "NVAPI_KEY" in discovered_keys:
-        architect_model = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+    content, roles = build_preset(provider_ids, entries, local_catalog_ids)
+    destination = common.presets_dir() / "auto-discovered.toml"
+    try:
+        common.load_toml(destination) if destination.exists() else None
+        common.atomic_write(destination, content, private=True)
+        common.load_toml(destination)
+        if args.activate:
+            common.apply_preset(destination)
+    except (OSError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
-    print("\n🎯 Auto-Configuring Optimal Heterogeneous DAG Mapping:")
-    print(f"  • Orchestrator : {orchestrator_model}")
-    print(f"  • Explore      : {explore_model}")
-    print(f"  • Architect    : {architect_model}")
-    print(f"  • Implementor  : {implementor_model}")
-    print(f"  • Verifier     : {verifier_model}")
+    print("\n🎯 Generated DAG mapping:")
+    common.print_models(roles)
+    print(f"\n✅ Saved preset to {destination}")
+    if args.activate:
+        print(f"✅ Activated it in {common.config_path()}")
+    else:
+        print("   Activate with: legion-mode auto")
+    if not provider_ids and not local_catalog_ids:
+        print(
+            "   Note: no provider key or local service was found; the stock Grok "
+            "model remains selected."
+        )
+    return 0
 
-    # Generate or update config.toml
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
-
-    toml_content = f"""# Auto-Discovered Config generated by tools/auto-discover.py
-
-[subagents]
-enabled = true
-
-[subagents.models]
-orchestrator    = "{orchestrator_model}"
-explore         = "{explore_model}"
-architect       = "{architect_model}"
-implementor     = "{implementor_model}"
-verifier        = "{verifier_model}"
-# Backward-compatibility aliases for legacy engine tools
-plan            = "{architect_model}"
-general-purpose = "{implementor_model}"
-
-[subagents.fallback]
-verifier = "{orchestrator_model}"
-"""
-
-    # Write discovered auto-generated preset
-    auto_preset = PRESETS_DIR / "auto-discovered.toml"
-    with open(auto_preset, "w") as f:
-        f.write(toml_content)
-
-    print(f"\n✅ Auto-Discovery complete! Saved preset to: {auto_preset}")
-    print("   Run './tools/switch-subagents.sh auto-discovered' to activate your detected setup anytime!")
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

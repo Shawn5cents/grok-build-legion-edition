@@ -556,7 +556,7 @@ async fn dashboard_change_location_persists_worktree_toggle() {
         d.location_picker = Some(lp);
     }
     let tmp = tempfile::tempdir().unwrap();
-    std::fs::create_dir(tmp.path().join(".git")).unwrap();
+    git2::Repository::init(tmp.path()).unwrap();
     let target = dunce::canonicalize(tmp.path()).unwrap_or_else(|_| tmp.path().to_path_buf());
     dispatch(
         Action::DashboardChangeLocation {

@@ -163,22 +163,6 @@ impl ModelState {
         }
     }
 
-    /// Load configured credentials from `~/.grok/credentials.toml` and ingest models into available catalog.
-    pub fn ingest_credentials_catalog(&mut self) {
-        let creds = crate::views::connect_modal::load_credentials();
-        for (provider_id, entry) in creds.providers {
-            if !entry.api_key.is_empty() {
-                if let Ok(discovered) = crate::views::connect_modal::validate_key_against_endpoint(&entry.endpoint, &entry.api_key) {
-                    for m in discovered {
-                        let id = acp::ModelId::new(std::sync::Arc::from(m.clone()));
-                        let info = acp::ModelInfo::new(id.clone(), format!("{provider_id}/{m}"));
-                        self.available.insert(id, info);
-                    }
-                }
-            }
-        }
-    }
-
     /// Set the current model and resolve reasoning effort from catalog meta.
     pub fn set_current(
         &mut self,

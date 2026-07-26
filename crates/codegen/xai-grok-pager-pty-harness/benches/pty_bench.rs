@@ -30,7 +30,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use clap::Parser as ClapParser;
 use xai_grok_pager_pty_harness::{
     BenchResults, ContentController, PtyHarness, Scenario, compare_baseline, pager_binary,
@@ -103,6 +103,11 @@ async fn main() -> ExitCode {
 async fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
 
+    if cli.bench && cli.scenario.is_none() && !cli.all {
+        eprintln!("pty-bench: skipped — select --scenario <name> or --all to run measurements");
+        return Ok(ExitCode::SUCCESS);
+    }
+
     let binary = match cli.binary {
         Some(b) => b,
         None => pager_binary().context("resolve pager binary")?,
@@ -112,7 +117,8 @@ async fn run() -> Result<ExitCode> {
     } else if let Some(s) = cli.scenario {
         vec![s]
     } else {
-        bail!("specify --scenario <name> or --all");
+        eprintln!("pty-bench: no scenarios selected; use --scenario <name> or --all");
+        return Ok(ExitCode::SUCCESS);
     };
 
     tracing::info!(

@@ -12,18 +12,16 @@ contractive critic or verification edges before consequential outputs.
 
 What sets **grok-build-legion-edition** apart is its **Zero-Touch Auto-Discovery Engine** (`tools/auto-discover.py`).
 
-Instead of manually editing TOML files or wiring providers in Rust, running auto-discovery automatically scans:
-1. **Environment API Keys**: Detects `OPENCODE_API_KEY`, `NVIDIA_API_KEY` (`NVAPI_KEY`), `VENICE_API_KEY`, `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `ZENMUX_API_KEY`, `KIMI_API_KEY`, `CLINE_API_KEY`, `CODEX_API_KEY`, `KILO_API_KEY`, `AGY_API_KEY`, `XAI_API_KEY`.
-2. **Installed CLI Tools**: Detects `OpenCode`, `Ollama`, `LiteLLM`, `Legion`, `Horde`, `agy`, `codex`, `cline`, `go`, and `python3`.
-3. **Active Local Endpoints**: Probes HTTP ports 4096 (OpenCode Go), 8317 (CLIProxyAPI), 11434 (Ollama), 4000 (LiteLLM), 1234 (LM Studio).
-4. **Auto-Configures Best DAG Profile**: Instantly generates `auto-discovered.toml` tailored to your machine's exact installed keys and tools!
+Instead of manually editing TOML files, auto-discovery checks:
+
+1. **Provider credentials**: `OPENCODE_API_KEY`, `NVIDIA_API_KEY`/`NVAPI_KEY`, `VENICE_API_KEY`, `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `ZENMUX_API_KEY`, `KIMI_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`, and `XAI_API_KEY`.
+2. **Installed AI clients**: reports `ollama`, `opencode`, `litellm`, `agy`, `codex`, and `cline` for visibility. A binary alone is not treated as a working provider.
+3. **Reachable local endpoints**: probes ports 4096 (OpenCode), 8317 (CLIProxyAPI), 11434 (Ollama), 4000 (LiteLLM), and 1234 (LM Studio), then records the models actually returned by `/v1/models`.
+4. **Usable runtime configuration**: generates `auto-discovered.toml` with both DAG role mappings and the `[model.*]` endpoint/auth entries required by the agent runtime.
 
 ```bash
 # Auto-discover system capabilities and generate preset
-./tools/auto-discover.py
-
-# Activate auto-discovered DAG preset
-./tools/switch-subagents.sh auto-discovered
+./tools/auto-discover.py --activate
 ```
 
 ## Runtime Graph

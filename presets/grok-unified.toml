@@ -1,0 +1,14 @@
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "grok-4.5"
+explore = "grok-4.5"
+architect = "grok-4.5"
+implementor = "grok-4.5"
+verifier = "grok-4.5"
+plan = "grok-4.5"
+general-purpose = "grok-4.5"
+
+[subagents.fallback]
+verifier = "grok-4.5"

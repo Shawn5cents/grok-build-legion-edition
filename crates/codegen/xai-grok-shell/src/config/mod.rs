@@ -460,7 +460,7 @@ impl SubagentsConfig {
         let subagents_val = config.get("subagents");
         let has_explicit_enabled = subagents_val
             .and_then(|v| v.as_table())
-            .map_or(false, |t| t.contains_key("enabled"));
+            .is_some_and(|t| t.contains_key("enabled"));
         let mut result: Self = subagents_val
             .and_then(|v| v.clone().try_into().ok())
             .unwrap_or_default();

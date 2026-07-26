@@ -1195,7 +1195,7 @@ pub(crate) async fn run(
     // per-session (in-memory `app.tip_seen_counts`), so each run starts fresh.
 
     // Cache whether cwd is inside a git repo (avoids repeated stat() in draw).
-    app.cwd_has_git_ancestor = app.cwd.ancestors().any(|p| p.join(".git").exists());
+    app.cwd_has_git_ancestor = crate::git_info::is_git_repository(&app.cwd);
 
     // Probe / auto-cadence / terminal telemetry — see `display_refresh_startup`.
     let motion = super::display_refresh_startup::start(

@@ -585,6 +585,20 @@ fn resolve_claude_settings_inner(
     policy_block: Option<&'static str>,
     user_mode_load: UserDefaultModeLoad,
 ) -> Option<(PermissionConfig, Vec<SkippedPermission>, PathBuf)> {
+    resolve_claude_settings_from_paths(
+        cwd,
+        claude_settings_paths_for_trust(cwd, project_trusted),
+        policy_block,
+        user_mode_load,
+    )
+}
+
+fn resolve_claude_settings_from_paths(
+    cwd: &Path,
+    paths: impl IntoIterator<Item = PathBuf>,
+    policy_block: Option<&'static str>,
+    user_mode_load: UserDefaultModeLoad,
+) -> Option<(PermissionConfig, Vec<SkippedPermission>, PathBuf)> {
     let mut all_rules = Vec::new();
     let mut all_skipped = Vec::new();
     let mut primary_source_path: Option<PathBuf> = None;
@@ -596,8 +610,7 @@ fn resolve_claude_settings_inner(
     let mut prompt_policy = PromptPolicy::default();
     let mut files_with_rules: u32 = 0;
 
-    // Same path set as env injection ([`claude_settings_paths_for_trust`]).
-    for path in claude_settings_paths_for_trust(cwd, project_trusted) {
+    for path in paths {
         let Some(settings) = load_claude_settings(&path) else {
             continue;
         };
@@ -1405,6 +1418,32 @@ mod tests {
     // aliased here so the existing `EnvVarGuard::set/unset` call sites are unchanged.
     use crate::TestEnvGuard as EnvVarGuard;
 
+    fn project_settings_paths(cwd: &Path) -> Vec<PathBuf> {
+        let global_dir = dirs::home_dir().map(|home| home.join(".claude"));
+        find_claude_settings_paths(cwd)
+            .into_iter()
+            .filter(|path| {
+                global_dir
+                    .as_ref()
+                    .is_none_or(|global| !path.starts_with(global))
+            })
+            .collect()
+    }
+
+    fn resolve_fixture_settings(
+        cwd: &Path,
+        project_trusted: bool,
+        policy_block: Option<&'static str>,
+        user_mode_load: UserDefaultModeLoad,
+    ) -> Option<(PermissionConfig, Vec<SkippedPermission>, PathBuf)> {
+        let paths = if project_trusted {
+            project_settings_paths(cwd)
+        } else {
+            Vec::new()
+        };
+        resolve_claude_settings_from_paths(cwd, paths, policy_block, user_mode_load)
+    }
+
     /// Only `Deny` rules on read-capable tools (Read/Grep/Any) become grep
     /// excludes — write-only denies and non-deny actions are left out.
     #[test]
@@ -1719,7 +1758,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let cwd = tmp.path();
 
-        let paths = find_claude_settings_paths(cwd);
+        let paths = project_settings_paths(cwd);
         // Should return candidate paths
         assert!(!paths.is_empty(), "should return candidate paths");
 
@@ -1773,8 +1812,7 @@ mod tests {
         .unwrap();
 
         let (cfg, _, _) =
-            resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply).unwrap();
         assert_eq!(cfg.rules.len(), 2);
         // Explicit permission rule comes first
         assert_eq!(cfg.rules[0].tool, ToolFilter::Bash);
@@ -1796,8 +1834,7 @@ mod tests {
         .unwrap();
 
         let (cfg, skipped, _) =
-            resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply).unwrap();
         assert_eq!(cfg.rules.len(), 1);
         assert_eq!(cfg.rules[0].action, RuleAction::Allow);
         assert_eq!(cfg.rules[0].tool, ToolFilter::Edit);
@@ -1816,8 +1853,7 @@ mod tests {
         .unwrap();
 
         let (cfg, skipped, path) =
-            resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply).unwrap();
         assert_eq!(cfg.rules.len(), 1);
         assert_eq!(cfg.rules[0].tool, ToolFilter::Bash);
         assert!(skipped.is_empty());
@@ -1828,8 +1864,7 @@ mod tests {
     fn no_claude_settings_returns_none() {
         let tmp = tempfile::tempdir().unwrap();
         assert!(
-            resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
-                .is_none()
+            resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply).is_none()
         );
     }
 
@@ -1845,8 +1880,7 @@ mod tests {
         .unwrap();
 
         let (cfg, _, _) =
-            resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply).unwrap();
         assert_eq!(cfg.rules.len(), 2);
         // Explicit Deny Edit wins over the synthetic Allow (deny > ask > allow)
         assert_eq!(cfg.rules[0].action, RuleAction::Deny);
@@ -2707,8 +2741,7 @@ mod tests {
 
         // Resolve from sub_dir — should merge BOTH files
         let (cfg, _, _) =
-            resolve_claude_settings_inner(&sub_dir, true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(&sub_dir, true, None, UserDefaultModeLoad::Apply).unwrap();
 
         // Should have all 3 rules: Edit(src/**) + Bash(*) + Read(*)
         assert_eq!(
@@ -2755,8 +2788,7 @@ mod tests {
         .unwrap();
 
         let (cfg, _, _) =
-            resolve_claude_settings_inner(&sub_dir, true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(&sub_dir, true, None, UserDefaultModeLoad::Apply).unwrap();
 
         // Should have 2 rules: deny Bash(rm*) + allow Bash(*)
         assert_eq!(cfg.rules.len(), 2);
@@ -3064,8 +3096,7 @@ allow = ["Bash(evil *)"]
 
         // pin=None keeps this hermetic on machines whose real policy pins yolo.
         let (cfg, _, path) =
-            resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply).unwrap();
         assert_eq!(cfg.rules.len(), 1);
         assert_eq!(cfg.rules[0].action, RuleAction::Allow);
         assert_eq!(cfg.rules[0].tool, ToolFilter::Any);
@@ -3091,8 +3122,7 @@ allow = ["Bash(evil *)"]
         .unwrap();
 
         let (cfg, _, _) =
-            resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply).unwrap();
         assert_eq!(cfg.rules.len(), 2);
         // Deny rule exists
         assert!(cfg.rules.iter().any(|r| r.action == RuleAction::Deny));
@@ -3130,8 +3160,7 @@ allow = ["Bash(evil *)"]
         .unwrap();
 
         let (cfg, _, _) =
-            resolve_claude_settings_inner(&sub_dir, true, None, UserDefaultModeLoad::Apply)
-                .unwrap();
+            resolve_fixture_settings(&sub_dir, true, None, UserDefaultModeLoad::Apply).unwrap();
         // Should produce Allow Any (bypassPermissions), NOT Allow Edit (acceptEdits)
         assert_eq!(cfg.rules.len(), 1);
         assert_eq!(cfg.rules[0].tool, ToolFilter::Any);
@@ -3185,7 +3214,7 @@ allow = ["Bash(evil *)"]
         .unwrap();
 
         let (cfg, skipped, _) =
-            resolve_claude_settings_inner(tmp.path(), true, Some(PIN), UserDefaultModeLoad::Apply)
+            resolve_fixture_settings(tmp.path(), true, Some(PIN), UserDefaultModeLoad::Apply)
                 .unwrap();
         assert_eq!(cfg.rules.len(), 1, "only the explicit deny survives");
         assert_eq!(cfg.rules[0].action, RuleAction::Deny);
@@ -3214,7 +3243,7 @@ allow = ["Bash(evil *)"]
         .unwrap();
 
         let (cfg, skipped, path) =
-            resolve_claude_settings_inner(tmp.path(), true, Some(PIN), UserDefaultModeLoad::Apply)
+            resolve_fixture_settings(tmp.path(), true, Some(PIN), UserDefaultModeLoad::Apply)
                 .unwrap();
         assert!(cfg.rules.is_empty(), "no synthetic rule under the pin");
         assert_eq!(cfg.prompt_policy, PromptPolicy::Ask);
@@ -3241,7 +3270,7 @@ allow = ["Bash(evil *)"]
         .unwrap();
 
         let (cfg, skipped, _) =
-            resolve_claude_settings_inner(tmp.path(), true, Some(PIN), UserDefaultModeLoad::Apply)
+            resolve_fixture_settings(tmp.path(), true, Some(PIN), UserDefaultModeLoad::Apply)
                 .unwrap();
         assert_eq!(cfg.rules.len(), 1);
         assert_eq!(cfg.rules[0].action, RuleAction::Allow);
@@ -4170,7 +4199,7 @@ allow = ["Bash(evil *)"]
             .unwrap();
 
             let (cfg, _, _) =
-                resolve_claude_settings_inner(tmp.path(), true, None, UserDefaultModeLoad::Apply)
+                resolve_fixture_settings(tmp.path(), true, None, UserDefaultModeLoad::Apply)
                     .unwrap();
             // Should have only the explicit rule, no synthetic
             assert_eq!(

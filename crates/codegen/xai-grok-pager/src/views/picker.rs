@@ -533,7 +533,12 @@ fn render_search_bar_with_label_viewport(
                 // rename overlay's cursor style).
                 if let Some(cell) = buf.cell_mut((cursor_x, y)) {
                     let cursor_fg = if let Some(c) = bg { c } else { theme.bg_base };
-                    cell.set_style(Style::default().fg(cursor_fg).bg(theme.text_primary));
+                    cell.set_style(
+                        Style::default()
+                            .fg(cursor_fg)
+                            .bg(theme.text_primary)
+                            .add_modifier(Modifier::REVERSED),
+                    );
                 }
             }
         }
@@ -3384,7 +3389,7 @@ mod tests {
             for x in hit.search_bar.x..hit.search_bar.x + hit.search_bar.width {
                 if let Some(cell) = buf.cell((x, y)) {
                     text.push_str(cell.symbol());
-                    if cell.bg == theme.text_primary {
+                    if cell.modifier.contains(Modifier::REVERSED) {
                         has_cursor = true;
                     }
                 }

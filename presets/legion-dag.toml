@@ -1,0 +1,45 @@
+[preset]
+required_env = ["DEEPSEEK_API_KEY", "NVIDIA_API_KEY", "MINIMAX_API_KEY"]
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "deepseek-v4-pro"
+explore = "deepseek-v4-flash"
+architect = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+implementor = "MiniMax-M3"
+verifier = "grok-4.5"
+plan = "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+general-purpose = "MiniMax-M3"
+
+[subagents.fallback]
+verifier = "deepseek-v4-pro"
+
+[model.deepseek-v4-pro]
+model = "deepseek-v4-pro"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Pro"
+env_key = "DEEPSEEK_API_KEY"
+context_window = 1000000
+
+[model.deepseek-v4-flash]
+model = "deepseek-v4-flash"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Flash"
+env_key = "DEEPSEEK_API_KEY"
+context_window = 1000000
+
+[model."nvidia/nvidia/nemotron-3-ultra-550b-a55b"]
+model = "nvidia/nemotron-3-ultra-550b-a55b"
+base_url = "https://integrate.api.nvidia.com/v1"
+name = "Nemotron Ultra (NVIDIA NIM)"
+env_key = ["NVIDIA_API_KEY", "NVAPI_KEY"]
+context_window = 128000
+
+[model.MiniMax-M3]
+model = "MiniMax-M3"
+base_url = "https://api.minimax.io/v1"
+name = "MiniMax M3"
+env_key = "MINIMAX_API_KEY"
+context_window = 1000000

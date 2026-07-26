@@ -155,10 +155,11 @@ async fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
 
     if !cfg!(target_os = "macos") {
-        bail!(
-            "paste-latency drives the REAL macOS pasteboard (pbcopy/osascript) through the \
-             pager's Ctrl+V path, which only exists on macOS — run it on a Mac"
+        eprintln!(
+            "paste-latency: skipped — the real Ctrl+V pasteboard benchmark is only available \
+             on macOS"
         );
+        return Ok(ExitCode::SUCCESS);
     }
 
     let binary = match cli.binary {

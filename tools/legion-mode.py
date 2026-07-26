@@ -1,219 +1,232 @@
 #!/usr/bin/env python3
-"""
-Interactive Mode Selector & Preset Creator for Legion Grok
+"""Interactive preset selector and custom DAG preset creator for Legion."""
 
-Allows users to switch modes effortlessly via an interactive terminal menu,
-or easily create custom DAG preset profiles with zero hassle.
-"""
+from __future__ import annotations
 
-import os
-import sys
+import argparse
+import re
 import subprocess
+import sys
 from pathlib import Path
 
-HOME = Path.home()
-CONFIG = HOME / ".grok" / "config.toml"
-PRESETS_DIR = HOME / ".grok" / "config-presets"
+import legion_common as common
 
-possible_switch_locations = [
-    Path(__file__).resolve().parent / "switch-subagents.sh",
-    HOME / "Desktop" / "grok-build-legion-edition" / "grok-build-legion-edition-main" / "tools" / "switch-subagents.sh",
-    Path.cwd() / "tools" / "switch-subagents.sh",
-]
-
-SWITCH_SCRIPT = next((p for p in possible_switch_locations if p.exists()), None)
-AUTO_SCRIPT = Path(__file__).resolve().parent / "auto-discover.py"
-if not AUTO_SCRIPT.exists():
-    AUTO_SCRIPT = HOME / "Desktop" / "grok-build-legion-edition" / "grok-build-legion-edition-main" / "tools" / "auto-discover.py"
+SCRIPT_DIR = Path(__file__).resolve().parent
+SWITCH_SCRIPT = SCRIPT_DIR / "switch-subagents.sh"
+AUTO_SCRIPT = SCRIPT_DIR / "auto-discover.py"
 
 MODES = [
     {
         "key": "1",
         "preset": "grok-unified",
-        "title": "🌟 Standard Grok 4.5 Mode",
-        "desc": "Runs standard Grok 4.5 for all subagent roles, exactly like stock grok."
+        "aliases": {"original", "grok", "default"},
+        "title": "🌟 Standard Grok Mode",
+        "desc": "Uses the normal Grok model for every subagent role.",
     },
     {
         "key": "2",
         "preset": "legion-dag",
-        "title": "🕸️ Legion Multi-Agent DAG Mode",
-        "desc": "DeepSeek V4 Pro (Architect/Lead) + DeepSeek V4 Flash (Explore) + MiniMax-M3 (Implementor) + Grok 4.5 (Verifier)."
+        "aliases": {"legion", "dag"},
+        "title": "🕸️ Legion Multi-Agent DAG",
+        "desc": "DeepSeek lead/explore, NVIDIA architect, MiniMax implementor, Grok verifier.",
     },
     {
         "key": "3",
         "preset": "big-pickle-dag",
-        "title": "🥒 OpenCode Big Pickle DAG Mode",
-        "desc": "OpenCode Big Pickle (Architect/Lead) + DeepSeek Flash Free (Explore) + Nemotron 550B (Verifier)."
+        "aliases": {"pickle", "big-pickle"},
+        "title": "🥒 OpenCode Big Pickle DAG",
+        "desc": "OpenCode lead/explore with specialized implementation and verification.",
     },
     {
         "key": "4",
         "preset": "free-legion-dag",
-        "title": "🎁 100% Free / Zero-Cost DAG Mode",
-        "desc": "$0 Cost: Free Claude Sonnet 5 + Free Kimi K3 + DeepSeek Flash Free + Nemotron Ultra Free."
+        "aliases": {"free"},
+        "title": "🎁 Free-Tier DAG",
+        "desc": "Uses provider free-tier routes; provider credentials may still be required.",
     },
     {
         "key": "5",
         "preset": "nvidia-nim-dag",
-        "title": "🟢 NVIDIA NIM DAG Mode",
-        "desc": "Nemotron 550B + DeepSeek R1 NIM + Llama 3.3 70B via integrate.api.nvidia.com."
+        "aliases": {"nvidia", "nim"},
+        "title": "🟢 NVIDIA NIM DAG",
+        "desc": "Routes specialist roles through NVIDIA NIM.",
     },
     {
         "key": "6",
         "preset": "venice-ai-dag",
-        "title": "🪟 Venice AI Privacy DAG Mode",
-        "desc": "Hermes 3 Llama 405B + Venice DeepSeek R1 + Qwen Coder (Zero-Data-Retention & Uncensored)."
+        "aliases": {"venice"},
+        "title": "🪟 Venice AI Privacy DAG",
+        "desc": "Routes the DAG through Venice AI models.",
     },
     {
         "key": "7",
         "preset": "cline-pass-dag",
-        "title": "✨ Cline Pass + Codex + Kimi Code Mode",
-        "desc": "Cline Pass (Architect/Lead) + Kimi K3 (Explore) + Codex Latest (Implementor) + Grok 4.5 (Verifier)."
+        "aliases": {"cline", "codex"},
+        "title": "✨ Cline Pass + Codex DAG",
+        "desc": "Uses Cline Pass, Kimi, Codex, and Grok specialist roles.",
     },
     {
         "key": "8",
         "preset": "auto-discovered",
-        "title": "🔍 Zero-Touch Auto-Discovered Mode",
-        "desc": "Auto-detects API keys and installed binaries on your machine and generates tailored profile."
-    }
+        "aliases": {"auto"},
+        "title": "🔍 Auto-Discovered DAG",
+        "desc": "Builds a profile from credentials and reachable local model services.",
+    },
 ]
 
-def switch_mode(preset):
-    if not SWITCH_SCRIPT:
-        print("Error: switch-subagents.sh tool not found.")
-        sys.exit(1)
-    subprocess.run([str(SWITCH_SCRIPT), preset], check=True)
 
-def create_custom_preset():
+def switch_mode(preset: str) -> None:
+    if not SWITCH_SCRIPT.is_file():
+        raise RuntimeError(f"preset switcher not found at {SWITCH_SCRIPT}")
+    result = subprocess.run([str(SWITCH_SCRIPT), preset], check=False)
+    if result.returncode:
+        raise RuntimeError(f"could not activate preset {preset!r}")
+
+
+def run_auto_discovery() -> None:
+    if not AUTO_SCRIPT.is_file():
+        raise RuntimeError(f"auto-discovery tool not found at {AUTO_SCRIPT}")
+    result = subprocess.run([sys.executable, str(AUTO_SCRIPT)], check=False)
+    if result.returncode:
+        raise RuntimeError("auto-discovery failed")
+
+
+def sanitize_preset_name(value: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9._-]+", "-", value.strip().lower()).strip(".-")
+    return cleaned or "custom"
+
+
+def create_custom_preset() -> None:
     print("\n" + "=" * 65)
     print("🎨 Create Custom Subagent DAG Preset")
     print("=" * 65)
-    print("Specify your preferred model ID for each role (press Enter to accept default):\n")
-
+    print("Press Enter to accept each default.\n")
     try:
-        preset_name = input("Preset Name [e.g., my-custom-dag]: ").strip().lower().replace(" ", "-")
-        if not preset_name:
-            preset_name = "custom"
-        
-        orchestrator = input("Orchestrator Model [default: deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
-        explore      = input("Explore Model      [default: deepseek-v4-flash]: ").strip() or "deepseek-v4-flash"
-        architect    = input("Architect Model    [default: deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
-        implementor  = input("Implementor Model  [default: MiniMax-M3]: ").strip() or "MiniMax-M3"
-        verifier     = input("Verifier Model     [default: grok-4.5]: ").strip() or "grok-4.5"
+        preset_name = sanitize_preset_name(input("Preset name [custom]: "))
+        models = {
+            "orchestrator": input("Orchestrator model [grok-4.5]: ").strip() or "grok-4.5",
+            "explore": input("Explore model [grok-4.5]: ").strip() or "grok-4.5",
+            "architect": input("Architect model [grok-4.5]: ").strip() or "grok-4.5",
+            "implementor": input("Implementor model [grok-4.5]: ").strip() or "grok-4.5",
+            "verifier": input("Verifier model [grok-4.5]: ").strip() or "grok-4.5",
+        }
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
-        sys.exit(0)
+        return
 
-    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
-    custom_file = PRESETS_DIR / f"{preset_name}.toml"
-
-    content = f"""# Custom Preset: {preset_name}
-[subagents]
-enabled = true
-
-[subagents.models]
-orchestrator    = "{orchestrator}"
-explore         = "{explore}"
-architect       = "{architect}"
-implementor     = "{implementor}"
-verifier        = "{verifier}"
-# Backward-compatibility aliases
-plan            = "{architect}"
-general-purpose = "{implementor}"
-
-[subagents.fallback]
-verifier = "{orchestrator}"
-"""
-    with open(custom_file, "w") as f:
-        f.write(content)
-
-    print(f"\n✅ Custom preset created at: {custom_file}")
+    models["plan"] = models["architect"]
+    models["general-purpose"] = models["implementor"]
+    content = common.replace_table("", "subagents", {"enabled": True})
+    content = common.replace_table(content, "subagents.models", models)
+    content = common.replace_table(
+        content,
+        "subagents.fallback",
+        {"verifier": models["orchestrator"]},
+    )
+    destination = common.presets_dir() / f"{preset_name}.toml"
+    common.atomic_write(destination, f"# Custom preset: {preset_name}\n\n{content}", private=False)
+    print(f"\n✅ Created {destination}")
     switch_mode(preset_name)
 
-def show_menu():
-    print("\n" + "=" * 65)
-    print("⚔️  Legion Grok Mode Selector")
-    print("=" * 65)
-    print("Select an active operating mode for your agent sessions:\n")
 
+def show_menu() -> None:
+    print("\n" + "=" * 65)
+    print("⚔️  Legion Mode Selector")
+    print("=" * 65)
+    print("Select an operating mode:\n")
     for mode in MODES:
         print(f"  [{mode['key']}] {mode['title']}")
-        print(f"      ↳ {mode['desc']}\n")
+        print(f"      {mode['desc']}\n")
 
-    # List any user custom presets in ~/.grok/config-presets/
-    custom_presets = []
-    if PRESETS_DIR.exists():
-        builtins = {m["preset"] for m in MODES}
-        for f in sorted(PRESETS_DIR.glob("*.toml")):
-            if f.stem not in builtins and f.stem != "auto-discovered":
-                custom_presets.append(f.stem)
-
-    if custom_presets:
-        print("  🎨 Custom Presets:")
-        for cp in custom_presets:
-            print(f"      • {cp} (run 'legion-mode {cp}')")
-        print("")
-
-    print("  [c] Create a New Custom Preset")
-    print("  [0] Run Zero-Touch Auto-Discovery Scan")
+    builtins = {mode["preset"] for mode in MODES}
+    custom = [path.stem for path in common.available_presets() if path.stem not in builtins]
+    if custom:
+        print("  Custom presets: " + ", ".join(custom))
+    print("  [c] Create a custom preset")
+    print("  [0] Re-run auto-discovery and activate it")
     print("  [q] Quit\n")
 
-def main():
-    if len(sys.argv) > 1:
-        choice = sys.argv[1].lower()
-        if choice in ["create", "new", "c"]:
-            create_custom_preset()
-            sys.exit(0)
-        elif choice in ["original", "grok", "default", "1"]:
-            target_preset = "grok-unified"
-        elif choice in ["legion", "dag", "2"]:
-            target_preset = "legion-dag"
-        elif choice in ["pickle", "big-pickle", "3"]:
-            target_preset = "big-pickle-dag"
-        elif choice in ["free", "4"]:
-            target_preset = "free-legion-dag"
-        elif choice in ["nvidia", "nim", "5"]:
-            target_preset = "nvidia-nim-dag"
-        elif choice in ["venice", "6"]:
-            target_preset = "venice-ai-dag"
-        elif choice in ["cline", "codex", "7"]:
-            target_preset = "cline-pass-dag"
-        elif choice in ["auto", "8", "0"]:
-            target_preset = "auto-discovered"
-        else:
-            target_preset = choice
-        
-        switch_mode(target_preset)
-        sys.exit(0)
 
-    show_menu()
+def resolve_mode(value: str) -> str | None:
+    lowered = value.lower()
+    for mode in MODES:
+        if lowered in {mode["key"], mode["preset"], *mode["aliases"]}:
+            return mode["preset"]
+    if common.resolve_preset(lowered) is not None:
+        return lowered
+    dag_variant = f"{lowered}-dag"
+    return dag_variant if common.resolve_preset(dag_variant) is not None else None
+
+
+def activate(value: str) -> None:
+    preset = resolve_mode(value)
+    if preset is None:
+        raise RuntimeError(
+            f"unknown mode {value!r}; run 'legion-mode --list' to see available presets"
+        )
+    if preset == "auto-discovered" and not (
+        common.presets_dir() / "auto-discovered.toml"
+    ).is_file():
+        run_auto_discovery()
+    switch_mode(preset)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Select or create a Legion heterogeneous-agent DAG preset."
+    )
+    parser.add_argument("mode", nargs="?", help="preset name, alias, or menu number")
+    parser.add_argument("--list", action="store_true", help="list installed presets")
+    parser.add_argument(
+        "--discover",
+        action="store_true",
+        help="run capability discovery and activate the generated preset",
+    )
+    parser.add_argument(
+        "--create",
+        action="store_true",
+        help="interactively create and activate a custom preset",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
     try:
-        user_input = input("Enter selection [1-8, c, 0, or q]: ").strip().lower()
-    except (KeyboardInterrupt, EOFError):
-        print("\nCancelled.")
-        sys.exit(0)
+        if args.list:
+            return subprocess.run([str(SWITCH_SCRIPT), "list"], check=False).returncode
+        if args.discover:
+            run_auto_discovery()
+            switch_mode("auto-discovered")
+            return 0
+        if args.create or args.mode in {"create", "new", "c"}:
+            create_custom_preset()
+            return 0
+        if args.mode:
+            activate(args.mode)
+            return 0
 
-    if user_input == "q" or user_input == "":
-        print("No changes made.")
-        sys.exit(0)
-    elif user_input == "c":
-        create_custom_preset()
-    elif user_input == "0":
-        print("\nRunning Zero-Touch Auto-Discovery...")
-        if AUTO_SCRIPT.exists():
-            subprocess.run(["python3", str(AUTO_SCRIPT)], check=True)
-        switch_mode("auto-discovered")
-    else:
-        selected_mode = next((m for m in MODES if m["key"] == user_input), None)
-        if selected_mode:
-            print(f"\nActivating {selected_mode['title']}...")
-            switch_mode(selected_mode["preset"])
+        show_menu()
+        try:
+            choice = input("Enter selection [1-8, c, 0, or q]: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print("\nCancelled.")
+            return 0
+        if choice in {"", "q"}:
+            print("No changes made.")
+            return 0
+        if choice == "c":
+            create_custom_preset()
+        elif choice == "0":
+            run_auto_discovery()
+            switch_mode("auto-discovered")
         else:
-            # Check if user entered a custom preset name
-            custom_path = PRESETS_DIR / f"{user_input}.toml"
-            if custom_path.exists():
-                switch_mode(user_input)
-            else:
-                print("Invalid choice. No changes made.")
+            activate(choice)
+        return 0
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

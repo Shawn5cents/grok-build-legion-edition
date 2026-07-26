@@ -1,0 +1,39 @@
+[preset]
+required_env = ["CLINE_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY"]
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "cline-pass"
+explore = "kimi-k3"
+architect = "cline-pass"
+implementor = "openai/gpt-5-codex"
+verifier = "grok-4.5"
+plan = "cline-pass"
+general-purpose = "openai/gpt-5-codex"
+
+[subagents.fallback]
+verifier = "cline-pass"
+
+[model.cline-pass]
+model = "cline-pass"
+base_url = "https://api.cline.bot/v1"
+name = "Cline Pass"
+env_key = ["CLINE_API_KEY", "CLINE_PASS_KEY"]
+context_window = 200000
+
+[model.kimi-k3]
+model = "kimi-k3"
+base_url = "https://api.moonshot.ai/v1"
+name = "Kimi K3"
+env_key = "KIMI_API_KEY"
+context_window = 1000000
+
+[model."openai/gpt-5-codex"]
+model = "gpt-5-codex"
+base_url = "https://api.openai.com/v1"
+name = "OpenAI Codex"
+env_key = "OPENAI_API_KEY"
+api_backend = "responses"
+context_window = 128000

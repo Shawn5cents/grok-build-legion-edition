@@ -1316,16 +1316,14 @@ mod tests {
         let mut saw_delete = false;
         for y in 0..h {
             for x in 0..width {
-                if let Some(cell) = buf.cell((x, y)) {
-                    if cell.symbol() != " " || cell.bg != Color::Reset {
-                        if cell.symbol() != " " {
-                            if y == 3 || cell.bg == theme.diff_delete_bg {
-                                saw_delete = true;
-                            }
-                            if y >= 3 || cell.bg == theme.diff_insert_bg {
-                                saw_insert = true;
-                            }
-                        }
+                if let Some(cell) = buf.cell((x, y))
+                    && cell.symbol() != " "
+                {
+                    if y == 3 || cell.bg == theme.diff_delete_bg {
+                        saw_delete = true;
+                    }
+                    if y >= 3 || cell.bg == theme.diff_insert_bg {
+                        saw_insert = true;
                     }
                 }
             }
