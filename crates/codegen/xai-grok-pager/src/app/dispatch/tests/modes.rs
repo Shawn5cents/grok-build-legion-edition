@@ -1483,6 +1483,34 @@ fn set_yolo_mode_refreshes_open_modal_snapshots() {
 // ----------------------------------------------------------------
 
 #[test]
+fn set_permission_mode_legion_opens_assignment_menu() {
+    use crate::app::actions::PermissionModeKind;
+    let mut app = test_app_with_agent();
+
+    let effects = dispatch(
+        Action::SetPermissionMode(PermissionModeKind::Legion),
+        &mut app,
+    );
+
+    assert_eq!(app.current_ui.permission_mode.as_deref(), Some("legion"));
+    let modal = app.agents[&AgentId(0)]
+        .agents_modal
+        .as_ref()
+        .expect("Legion selection should open the assignment menu");
+    assert_eq!(
+        modal.active_tab,
+        crate::views::agents_modal::AgentsTab::Legion
+    );
+    assert!(effects.iter().any(|effect| matches!(
+        effect,
+        Effect::PersistPermissionMode {
+            canonical: "legion",
+            ..
+        }
+    )));
+}
+
+#[test]
 fn set_permission_mode_default_overrides_canonical_to_default() {
     use crate::app::actions::PermissionModeKind;
     let mut app = test_app_with_agent();

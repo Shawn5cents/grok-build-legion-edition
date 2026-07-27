@@ -57,6 +57,9 @@ pub enum ConfigUpdate {
     Memory(Box<crate::config::MemoryConfig>),
     /// Updated skills discovery config.
     Skills(xai_grok_agent::prompt::skills::SkillsConfig),
+    /// `[subagents]` changed. Agent should refresh role/model resolution for
+    /// subsequent subagent spawns in every active session.
+    SubagentsChanged,
     /// Updated `[compat]` vendor-compatibility config. Applied on the
     /// next agent (re)build, which re-resolves `compat_resolved`.
     Compat(Box<xai_grok_tools::types::compat::CompatConfigToml>),
@@ -369,6 +372,11 @@ impl ConfigReloader {
         if old_skills != new_skills {
             info!("skills config change detected");
             let _ = self.config_update_tx.send(ConfigUpdate::Skills(new_skills));
+        }
+
+        if self.last_global_config.get("subagents") != new_global.get("subagents") {
+            info!("subagent config change detected");
+            let _ = self.config_update_tx.send(ConfigUpdate::SubagentsChanged);
         }
 
         // Compat config ([compat] vendor toggles)

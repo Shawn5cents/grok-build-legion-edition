@@ -11,6 +11,7 @@
 //! - `x.ai/internal/reload_all_mcp_servers` config hot-reload, all sessions
 //! - `x.ai/internal/reload_project_mcp_servers` config hot-reload, cwd-scoped
 //! - `x.ai/internal/reload_skills`          skills file watcher fan-out
+//! - `x.ai/internal/reload_subagents`       Legion role/model assignment reload
 //! - `x.ai/internal/reload_models`          model list hot-reload from config.toml
 //! - `x.ai/internal/reload_models_cache`    model catalog hot-reload from disk cache
 //! - `x.ai/internal/auth_cleared`           auth hot-clear cleanup
@@ -46,6 +47,7 @@ pub async fn handle(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
         }
         "x.ai/internal/reload_skills" => handle_reload_skills(agent),
         "x.ai/internal/reload_workflows" => handle_reload_workflows(agent),
+        "x.ai/internal/reload_subagents" => handle_reload_subagents(agent),
         "x.ai/internal/reload_models" => handle_reload_models(agent),
         "x.ai/internal/reload_models_cache" => handle_reload_models_cache(agent),
         "x.ai/internal/auth_cleared" => handle_auth_cleared(agent),
@@ -584,6 +586,35 @@ fn handle_reload_models(agent: &MvpAgent) -> ExtResult {
     let count = agent.models_manager.models().len();
     tracing::info!(count, "model list reloaded from config.toml");
     ExtMethodResult::success(serde_json::json!({ "models": count }))
+        .to_ext_response()
+        .map_err(|e| acp::Error::internal_error().data(e.to_string()))
+}
+
+// internal/reload_subagents
+
+/// Refresh the trust-independent `[subagents]` base config in-place.
+///
+/// Coordinators clone these fields when a subagent is spawned, so active
+/// sessions pick up role/model changes without being recreated.
+fn handle_reload_subagents(agent: &MvpAgent) -> ExtResult {
+    let disk_config = crate::config::load_effective_config()
+        .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+    let cli_flag = agent.cfg.borrow().cli_subagents.unwrap_or(false);
+    let subagents = crate::config::SubagentsConfig::resolve(cli_flag, &disk_config);
+    let model_count = subagents.models.len();
+    {
+        let mut config = agent.cfg.borrow_mut();
+        config.subagents_enabled = subagents.enabled;
+        config.subagent_model_overrides = subagents.models;
+        config.subagent_toggle = subagents.toggle;
+        config.subagent_roles = subagents.roles;
+        config.subagent_personas = subagents.personas;
+    }
+    tracing::info!(
+        model_count,
+        "subagent assignments reloaded from config.toml"
+    );
+    ExtMethodResult::success(serde_json::json!({ "models": model_count }))
         .to_ext_response()
         .map_err(|e| acp::Error::internal_error().data(e.to_string()))
 }

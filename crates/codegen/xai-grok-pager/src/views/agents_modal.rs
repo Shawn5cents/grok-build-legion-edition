@@ -27,29 +27,85 @@ use xai_grok_tools::types::tool::ToolKind;
 pub enum AgentsTab {
     Agents,
     Personas,
+    Legion,
 }
 impl AgentsTab {
     /// All tabs in display order.
-    pub const ALL: &[Self] = &[Self::Agents, Self::Personas];
+    pub const ALL: &[Self] = &[Self::Agents, Self::Personas, Self::Legion];
     /// Display label for the tab bar.
     pub fn label(self) -> &'static str {
         match self {
             Self::Agents => "Agents",
             Self::Personas => "Personas",
+            Self::Legion => "Legion",
         }
     }
     /// Next tab (wraps around).
     pub fn next(self) -> Self {
         match self {
             Self::Agents => Self::Personas,
-            Self::Personas => Self::Agents,
+            Self::Personas => Self::Legion,
+            Self::Legion => Self::Agents,
         }
     }
     /// Previous tab (wraps around).
     pub fn prev(self) -> Self {
         match self {
-            Self::Agents => Self::Personas,
+            Self::Agents => Self::Legion,
             Self::Personas => Self::Agents,
+            Self::Legion => Self::Personas,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LegionRole {
+    key: &'static str,
+    label: &'static str,
+    description: &'static str,
+}
+
+const LEGION_ROLES: &[LegionRole] = &[
+    LegionRole {
+        key: "orchestrator",
+        label: "Orchestrator",
+        description: "Coordinates the DAG and delegates work.",
+    },
+    LegionRole {
+        key: "explore",
+        label: "Explore",
+        description: "Maps the codebase and gathers evidence.",
+    },
+    LegionRole {
+        key: "architect",
+        label: "Architect",
+        description: "Designs the implementation plan.",
+    },
+    LegionRole {
+        key: "implementor",
+        label: "Implementor",
+        description: "Builds the approved changes.",
+    },
+    LegionRole {
+        key: "verifier",
+        label: "Verifier",
+        description: "Reviews and validates the result.",
+    },
+];
+
+/// A provider model offered for Legion role assignment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegionModelOption {
+    pub id: String,
+    pub name: String,
+}
+
+impl LegionModelOption {
+    fn display_label(&self) -> String {
+        if self.name == self.id {
+            self.id.clone()
+        } else {
+            format!("{} ({})", self.name, self.id)
         }
     }
 }
@@ -267,6 +323,14 @@ pub struct AgentsModalState {
     pub persona_scroll: usize,
     /// Indices of expanded personas (showing description + capability tags).
     pub persona_expanded: std::collections::HashSet<usize>,
+    /// Live provider catalog used by the Legion role picker.
+    pub legion_models: Vec<LegionModelOption>,
+    /// Effective `[subagents.models]` assignments keyed by role.
+    pub legion_assignments: HashMap<String, String>,
+    pub legion_selected_role: usize,
+    pub legion_picker_open: bool,
+    pub legion_selected_model: usize,
+    pub legion_model_scroll: usize,
 }
 /// Built-in agent names that should be shown to the user.
 /// Skips internal variants (GrokBuildConcise, GrokBuildPlan,
@@ -316,7 +380,51 @@ impl AgentsModalState {
             persona_selected: 0,
             persona_scroll: 0,
             persona_expanded: std::collections::HashSet::new(),
+            legion_models: Vec::new(),
+            legion_assignments: load_legion_assignments(),
+            legion_selected_role: 0,
+            legion_picker_open: false,
+            legion_selected_model: 0,
+            legion_model_scroll: 0,
         }
+    }
+
+    /// Populate the Legion picker from the active session's live provider catalog.
+    pub fn set_legion_models(&mut self, models: Vec<LegionModelOption>) {
+        self.legion_models = models;
+        self.sync_legion_model_selection();
+    }
+
+    fn sync_legion_model_selection(&mut self) {
+        let Some(role) = LEGION_ROLES.get(self.legion_selected_role) else {
+            self.legion_selected_model = 0;
+            return;
+        };
+        let assigned = self.legion_assignments.get(role.key);
+        self.legion_selected_model = assigned
+            .and_then(|id| self.legion_models.iter().position(|model| &model.id == id))
+            .unwrap_or(0);
+        self.legion_model_scroll = 0;
+    }
+
+    fn legion_select_next_role(&mut self) {
+        self.legion_selected_role =
+            (self.legion_selected_role + 1).min(LEGION_ROLES.len().saturating_sub(1));
+    }
+
+    fn legion_select_prev_role(&mut self) {
+        self.legion_selected_role = self.legion_selected_role.saturating_sub(1);
+    }
+
+    fn open_legion_picker(&mut self) {
+        if self.legion_models.is_empty() {
+            self.message = Some(AgentsModalMessage::error(
+                "No connected models available. Run /connect, then reopen Legion.",
+            ));
+            return;
+        }
+        self.sync_legion_model_selection();
+        self.legion_picker_open = true;
     }
     /// Rebuild agent list from disk after a mutation.
     fn rebuild_agents(&mut self) {
@@ -339,6 +447,10 @@ impl AgentsModalState {
         match tab {
             AgentsTab::Agents => self.rebuild_agents(),
             AgentsTab::Personas => self.refresh_personas(),
+            AgentsTab::Legion => {
+                self.legion_assignments = load_legion_assignments();
+                self.sync_legion_model_selection();
+            }
         }
     }
     pub fn search_query(&self) -> &str {
@@ -374,6 +486,7 @@ impl AgentsModalState {
                     self.persona_selected = first;
                 }
             }
+            AgentsTab::Legion => {}
         }
     }
 }
@@ -582,6 +695,22 @@ pub fn load_agent_toggle() -> HashMap<String, bool> {
         .filter_map(|(k, v)| v.as_bool().map(|b| (k.to_string(), b)))
         .collect()
 }
+
+/// Load the effective `[subagents.models]` map used by Legion.
+pub fn load_legion_assignments() -> HashMap<String, String> {
+    xai_grok_shell::config::load_effective_config()
+        .ok()
+        .and_then(|root| root.get("subagents").cloned())
+        .and_then(|subagents| subagents.get("models").cloned())
+        .and_then(|models| models.as_table().cloned())
+        .map(|table| {
+            table
+                .into_iter()
+                .filter_map(|(key, value)| value.as_str().map(|id| (key, id.to_string())))
+                .collect()
+        })
+        .unwrap_or_default()
+}
 /// Sanitize a name for use as a filename: replace non-alphanumeric chars
 /// (except `-` and `_`) with `-`, require at least one alphanumeric char.
 pub fn sanitize_config_name(name: &str) -> Result<String, String> {
@@ -772,6 +901,53 @@ pub fn toggle_agent(name: &str, enabled: bool) -> Result<(), String> {
     std::fs::write(&config_path, doc.to_string())
         .map_err(|e| format!("Failed to write config.toml: {e}"))?;
     Ok(())
+}
+
+/// Persist one Legion role assignment and enable subagents.
+///
+/// The legacy `plan` and `general-purpose` aliases are kept in sync with the
+/// DAG's `architect` and `implementor` roles so every spawn path resolves the
+/// same model.
+pub fn set_legion_role_model(role: &str, model_id: &str) -> Result<(), String> {
+    let config_path = xai_grok_config::grok_home().join("config.toml");
+    set_legion_role_model_at(&config_path, role, model_id)
+}
+
+fn set_legion_role_model_at(config_path: &Path, role: &str, model_id: &str) -> Result<(), String> {
+    if !LEGION_ROLES.iter().any(|entry| entry.key == role) {
+        return Err(format!("Unknown Legion role '{role}'"));
+    }
+    if model_id.trim().is_empty() {
+        return Err("Model ID cannot be empty".to_string());
+    }
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {e}"))?;
+    }
+    let Some(mut doc) = crate::config_toml_edit::read_config_document_for_edit(config_path) else {
+        return Err("Could not read or parse config.toml".to_string());
+    };
+    if !doc.contains_key("subagents") {
+        doc["subagents"] = toml_edit::Item::Table(toml_edit::Table::new());
+    }
+    let subagents = doc["subagents"]
+        .as_table_mut()
+        .ok_or("subagents is not a table")?;
+    subagents["enabled"] = toml_edit::value(true);
+    if !subagents.contains_key("models") {
+        subagents["models"] = toml_edit::Item::Table(toml_edit::Table::new());
+    }
+    let models = subagents["models"]
+        .as_table_mut()
+        .ok_or("subagents.models is not a table")?;
+    models[role] = toml_edit::value(model_id);
+    match role {
+        "architect" => models["plan"] = toml_edit::value(model_id),
+        "implementor" => models["general-purpose"] = toml_edit::value(model_id),
+        _ => {}
+    }
+    std::fs::write(config_path, doc.to_string())
+        .map_err(|e| format!("Failed to write config.toml: {e}"))
 }
 /// Format detail lines for an expanded agent entry.
 pub fn format_agent_detail(entry: &AgentListEntry) -> Vec<String> {
@@ -1021,6 +1197,7 @@ pub fn render_agents_modal(
     let shortcuts: Vec<Shortcut<'_>> = match state.active_tab {
         AgentsTab::Agents => build_agents_tab_shortcuts(state),
         AgentsTab::Personas => build_personas_tab_shortcuts(state),
+        AgentsTab::Legion => build_legion_tab_shortcuts(state),
     };
     let config = ModalWindowConfig {
         title: "Agents",
@@ -1043,6 +1220,7 @@ pub fn render_agents_modal(
     match state.active_tab {
         AgentsTab::Agents => render_agents_tab(buf, &content_area, state, theme),
         AgentsTab::Personas => render_personas_tab(buf, &content_area, state, theme),
+        AgentsTab::Legion => render_legion_tab(buf, &content_area, state, theme),
     }
 }
 /// Build footer shortcuts for the Agents tab.
@@ -1180,6 +1358,51 @@ fn build_personas_tab_shortcuts<'a>(state: &AgentsModalState) -> Vec<Shortcut<'a
         ];
         modal_window::push_vim_nav_search_hint(&mut shortcuts, state.search_active);
         shortcuts
+    }
+}
+
+fn build_legion_tab_shortcuts(state: &AgentsModalState) -> Vec<Shortcut<'static>> {
+    if state.legion_picker_open {
+        vec![
+            Shortcut {
+                label: "j/k model",
+                clickable: false,
+                id: 0,
+            },
+            Shortcut {
+                label: "Enter assign",
+                clickable: false,
+                id: 0,
+            },
+            Shortcut {
+                label: "Esc back",
+                clickable: false,
+                id: 0,
+            },
+        ]
+    } else {
+        vec![
+            Shortcut {
+                label: "j/k role",
+                clickable: false,
+                id: 0,
+            },
+            Shortcut {
+                label: "Enter choose model",
+                clickable: false,
+                id: 0,
+            },
+            Shortcut {
+                label: "Tab switch tab",
+                clickable: false,
+                id: 0,
+            },
+            Shortcut {
+                label: "Esc close",
+                clickable: false,
+                id: 0,
+            },
+        ]
     }
 }
 fn render_agents_search(
@@ -1489,6 +1712,239 @@ fn render_agents_tab(
         }
     }
 }
+
+fn render_legion_tab(
+    buf: &mut Buffer,
+    content_area: &Rect,
+    state: &mut AgentsModalState,
+    theme: &Theme,
+) {
+    state.row_map.clear();
+    let mut y = content_area.y;
+    let bottom = content_area.y + content_area.height;
+    let width = content_area.width as usize;
+    if let Some(ref msg) = state.message {
+        y = render_modal_message_line(buf, content_area.x, y, width, msg, theme);
+    }
+
+    if state.legion_picker_open {
+        render_legion_model_picker(buf, content_area, y, state, theme);
+        return;
+    }
+
+    if y < bottom {
+        buf.set_string(
+            content_area.x,
+            y,
+            "Assign a connected model to every Legion DAG role.",
+            Style::default()
+                .fg(theme.text_primary)
+                .add_modifier(Modifier::BOLD),
+        );
+        y += 1;
+    }
+    if y < bottom {
+        buf.set_string(
+            content_area.x,
+            y,
+            "Assignments save immediately and apply to newly spawned agents.",
+            Style::default().fg(theme.gray_dim),
+        );
+        y += 2;
+    }
+
+    for (idx, role) in LEGION_ROLES.iter().enumerate() {
+        if y >= bottom {
+            break;
+        }
+        state.row_map.push((y, idx));
+        let selected = idx == state.legion_selected_role;
+        let row_style = if selected {
+            Style::default().bg(theme.bg_highlight)
+        } else {
+            Style::default()
+        };
+        if selected {
+            for x in content_area.x..content_area.x + content_area.width {
+                if let Some(cell) = buf.cell_mut((x, y)) {
+                    cell.set_style(row_style);
+                }
+            }
+        }
+        let indicator = if selected { "\u{25b6} " } else { "  " };
+        let mut x = content_area.x;
+        buf.set_string(
+            x,
+            y,
+            indicator,
+            Style::default().fg(theme.accent_user).bg(if selected {
+                theme.bg_highlight
+            } else {
+                theme.bg_base
+            }),
+        );
+        x += 2;
+        buf.set_string(
+            x,
+            y,
+            role.label,
+            Style::default()
+                .fg(theme.text_primary)
+                .bg(if selected {
+                    theme.bg_highlight
+                } else {
+                    theme.bg_base
+                })
+                .add_modifier(Modifier::BOLD),
+        );
+        let model = state
+            .legion_assignments
+            .get(role.key)
+            .map(|id| {
+                state
+                    .legion_models
+                    .iter()
+                    .find(|model| model.id == *id)
+                    .map(LegionModelOption::display_label)
+                    .unwrap_or_else(|| format!("{id} (not in live catalog)"))
+            })
+            .unwrap_or_else(|| "Not assigned".to_string());
+        let model_x = content_area.x + 18.min(content_area.width.saturating_sub(1));
+        let model_width = (content_area.x + content_area.width).saturating_sub(model_x) as usize;
+        if model_width > 0 {
+            let model = crate::render::line_utils::truncate_str(&model, model_width);
+            buf.set_string(
+                model_x,
+                y,
+                model,
+                Style::default()
+                    .fg(if state.legion_assignments.contains_key(role.key) {
+                        theme.accent_assistant
+                    } else {
+                        theme.accent_error
+                    })
+                    .bg(if selected {
+                        theme.bg_highlight
+                    } else {
+                        theme.bg_base
+                    }),
+            );
+        }
+        y += 1;
+        if y < bottom {
+            let description = crate::render::line_utils::truncate_str(
+                role.description,
+                content_area.width.saturating_sub(4) as usize,
+            );
+            buf.set_string(
+                content_area.x + 4,
+                y,
+                description,
+                Style::default().fg(theme.gray_dim),
+            );
+            y += 1;
+        }
+    }
+
+    if state.legion_models.is_empty() && y < bottom {
+        y += 1;
+        if y < bottom {
+            buf.set_string(
+                content_area.x,
+                y,
+                "No live models found. Run /connect, then reopen this menu.",
+                Style::default().fg(theme.accent_error),
+            );
+        }
+    }
+}
+
+fn render_legion_model_picker(
+    buf: &mut Buffer,
+    content_area: &Rect,
+    mut y: u16,
+    state: &mut AgentsModalState,
+    theme: &Theme,
+) {
+    let bottom = content_area.y + content_area.height;
+    let Some(role) = LEGION_ROLES.get(state.legion_selected_role) else {
+        return;
+    };
+    if y < bottom {
+        buf.set_string(
+            content_area.x,
+            y,
+            format!("Choose a model for {}", role.label),
+            Style::default()
+                .fg(theme.text_primary)
+                .add_modifier(Modifier::BOLD),
+        );
+        y += 1;
+    }
+    if y < bottom {
+        buf.set_string(
+            content_area.x,
+            y,
+            format!("{} connected models", state.legion_models.len()),
+            Style::default().fg(theme.gray_dim),
+        );
+        y += 2;
+    }
+    let visible_height = bottom.saturating_sub(y) as usize;
+    if visible_height == 0 {
+        return;
+    }
+    if state.legion_selected_model < state.legion_model_scroll {
+        state.legion_model_scroll = state.legion_selected_model;
+    } else if state.legion_selected_model >= state.legion_model_scroll + visible_height {
+        state.legion_model_scroll = state
+            .legion_selected_model
+            .saturating_add(1)
+            .saturating_sub(visible_height);
+    }
+    let max_scroll = state.legion_models.len().saturating_sub(visible_height);
+    state.legion_model_scroll = state.legion_model_scroll.min(max_scroll);
+    let end = (state.legion_model_scroll + visible_height).min(state.legion_models.len());
+    for (visible_idx, model_idx) in (state.legion_model_scroll..end).enumerate() {
+        let row_y = y + visible_idx as u16;
+        state.row_map.push((row_y, model_idx));
+        let selected = model_idx == state.legion_selected_model;
+        if selected {
+            let fill = Style::default().bg(theme.bg_highlight);
+            for x in content_area.x..content_area.x + content_area.width {
+                if let Some(cell) = buf.cell_mut((x, row_y)) {
+                    cell.set_style(fill);
+                }
+            }
+        }
+        let label = state.legion_models[model_idx].display_label();
+        let label = crate::render::line_utils::truncate_str(
+            &label,
+            content_area.width.saturating_sub(2) as usize,
+        );
+        buf.set_string(
+            content_area.x,
+            row_y,
+            if selected { "\u{25b6} " } else { "  " },
+            Style::default().fg(theme.accent_user).bg(if selected {
+                theme.bg_highlight
+            } else {
+                theme.bg_base
+            }),
+        );
+        buf.set_string(
+            content_area.x + 2,
+            row_y,
+            label,
+            Style::default().fg(theme.text_primary).bg(if selected {
+                theme.bg_highlight
+            } else {
+                theme.bg_base
+            }),
+        );
+    }
+}
+
 /// Render the Personas tab content.
 fn render_personas_tab(
     buf: &mut Buffer,
@@ -1956,12 +2412,13 @@ fn render_modal_message_line(
 }
 /// Clear create/confirm overlays belonging to the tab being left.
 fn clear_overlays_for_tab(state: &mut AgentsModalState, tab: AgentsTab) {
+    state.legion_picker_open = false;
     match tab {
         AgentsTab::Agents => {
             state.persona_input = None;
             state.persona_confirm = None;
         }
-        AgentsTab::Personas => {}
+        AgentsTab::Personas | AgentsTab::Legion => {}
     }
 }
 fn switch_agents_tab(state: &mut AgentsModalState, tab: AgentsTab) {
@@ -1978,6 +2435,19 @@ pub fn handle_agents_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agents
     }
     if state.persona_confirm.is_some() && state.active_tab == AgentsTab::Personas {
         return handle_persona_confirm_key(state, key);
+    }
+    if state.legion_picker_open && state.active_tab == AgentsTab::Legion {
+        match key.code {
+            KeyCode::Esc
+            | KeyCode::Enter
+            | KeyCode::Char('j')
+            | KeyCode::Char('k')
+            | KeyCode::Up
+            | KeyCode::Down
+            | KeyCode::PageUp
+            | KeyCode::PageDown => return handle_legion_picker_key(state, key),
+            _ => {}
+        }
     }
     if state.search_active {
         if key.code == KeyCode::Esc {
@@ -2036,6 +2506,7 @@ pub fn handle_agents_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agents
     match state.active_tab {
         AgentsTab::Agents => handle_agents_tab_key(state, key),
         AgentsTab::Personas => handle_personas_tab_key(state, key),
+        AgentsTab::Legion => handle_legion_tab_key(state, key),
     }
 }
 pub fn handle_agents_paste(state: &mut AgentsModalState, text: &str) -> AgentsModalOutcome {
@@ -2195,6 +2666,82 @@ fn handle_agents_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agents
         _ => AgentsModalOutcome::Unchanged,
     }
 }
+
+fn handle_legion_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> AgentsModalOutcome {
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            state.legion_select_next_role();
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            state.legion_select_prev_role();
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::Enter | KeyCode::Char('o') | KeyCode::Right => {
+            state.open_legion_picker();
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::Char('q') => AgentsModalOutcome::Close,
+        _ => AgentsModalOutcome::Unchanged,
+    }
+}
+
+fn handle_legion_picker_key(state: &mut AgentsModalState, key: &KeyEvent) -> AgentsModalOutcome {
+    match key.code {
+        KeyCode::Esc => {
+            state.legion_picker_open = false;
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            state.legion_selected_model =
+                (state.legion_selected_model + 1).min(state.legion_models.len().saturating_sub(1));
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            state.legion_selected_model = state.legion_selected_model.saturating_sub(1);
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::PageDown => {
+            state.legion_selected_model =
+                (state.legion_selected_model + 10).min(state.legion_models.len().saturating_sub(1));
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::PageUp => {
+            state.legion_selected_model = state.legion_selected_model.saturating_sub(10);
+            AgentsModalOutcome::Changed
+        }
+        KeyCode::Enter => assign_selected_legion_model(state),
+        _ => AgentsModalOutcome::Unchanged,
+    }
+}
+
+fn assign_selected_legion_model(state: &mut AgentsModalState) -> AgentsModalOutcome {
+    let Some(role) = LEGION_ROLES.get(state.legion_selected_role) else {
+        return AgentsModalOutcome::Unchanged;
+    };
+    let Some(model) = state.legion_models.get(state.legion_selected_model) else {
+        state.message = Some(AgentsModalMessage::error("No connected model is selected."));
+        return AgentsModalOutcome::Changed;
+    };
+    let role_key = role.key;
+    let role_label = role.label;
+    let model_id = model.id.clone();
+    let model_label = model.display_label();
+    match set_legion_role_model(role_key, &model_id) {
+        Ok(()) => {
+            state
+                .legion_assignments
+                .insert(role_key.to_string(), model_id);
+            state.legion_picker_open = false;
+            state.message = Some(AgentsModalMessage::success(format!(
+                "{role_label} assigned to {model_label}"
+            )));
+        }
+        Err(error) => state.message = Some(AgentsModalMessage::error(error)),
+    }
+    AgentsModalOutcome::Changed
+}
+
 /// Handle key input specific to the Personas tab.
 fn handle_personas_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> AgentsModalOutcome {
     match key.code {
@@ -2508,6 +3055,45 @@ pub fn handle_agents_mouse(state: &mut AgentsModalState, mouse: &MouseEvent) -> 
                     }
                     _ => AgentsModalOutcome::Unchanged,
                 },
+                AgentsTab::Legion => match mouse.kind {
+                    MouseEventKind::ScrollUp if in_content => {
+                        if state.legion_picker_open {
+                            state.legion_selected_model =
+                                state.legion_selected_model.saturating_sub(1);
+                        } else {
+                            state.legion_select_prev_role();
+                        }
+                        AgentsModalOutcome::Changed
+                    }
+                    MouseEventKind::ScrollDown if in_content => {
+                        if state.legion_picker_open {
+                            state.legion_selected_model = (state.legion_selected_model + 1)
+                                .min(state.legion_models.len().saturating_sub(1));
+                        } else {
+                            state.legion_select_next_role();
+                        }
+                        AgentsModalOutcome::Changed
+                    }
+                    MouseEventKind::Down(crossterm::event::MouseButton::Left) if in_content => {
+                        let clicked = state
+                            .row_map
+                            .iter()
+                            .find(|(y, _)| *y == mouse.row)
+                            .map(|(_, idx)| *idx);
+                        let Some(clicked) = clicked else {
+                            return AgentsModalOutcome::Unchanged;
+                        };
+                        if state.legion_picker_open {
+                            state.legion_selected_model = clicked;
+                            assign_selected_legion_model(state)
+                        } else {
+                            state.legion_selected_role = clicked;
+                            state.open_legion_picker();
+                            AgentsModalOutcome::Changed
+                        }
+                    }
+                    _ => AgentsModalOutcome::Unchanged,
+                },
             }
         }
     }
@@ -2519,18 +3105,21 @@ mod tests {
     #[test]
     fn agents_tab_next_cycles() {
         assert_eq!(AgentsTab::Agents.next(), AgentsTab::Personas);
-        assert_eq!(AgentsTab::Personas.next(), AgentsTab::Agents);
+        assert_eq!(AgentsTab::Personas.next(), AgentsTab::Legion);
+        assert_eq!(AgentsTab::Legion.next(), AgentsTab::Agents);
     }
     #[test]
     fn agents_tab_prev_cycles() {
-        assert_eq!(AgentsTab::Agents.prev(), AgentsTab::Personas);
+        assert_eq!(AgentsTab::Agents.prev(), AgentsTab::Legion);
         assert_eq!(AgentsTab::Personas.prev(), AgentsTab::Agents);
+        assert_eq!(AgentsTab::Legion.prev(), AgentsTab::Personas);
     }
     #[test]
     fn agents_tab_all_covers_variants() {
-        assert_eq!(AgentsTab::ALL.len(), 2);
+        assert_eq!(AgentsTab::ALL.len(), 3);
         assert_eq!(AgentsTab::ALL[0], AgentsTab::Agents);
         assert_eq!(AgentsTab::ALL[1], AgentsTab::Personas);
+        assert_eq!(AgentsTab::ALL[2], AgentsTab::Legion);
     }
     #[test]
     fn agents_tab_labels_nonempty() {
@@ -2544,6 +3133,44 @@ mod tests {
             assert_eq!(tab.next().prev(), tab);
             assert_eq!(tab.prev().next(), tab);
         }
+    }
+    #[test]
+    fn legion_assignment_enables_subagents_and_syncs_legacy_aliases() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config = dir.path().join("config.toml");
+        std::fs::write(&config, "[ui]\ntheme = \"dark\"\n").expect("seed config");
+
+        set_legion_role_model_at(&config, "architect", "provider/architect").expect("architect");
+        set_legion_role_model_at(&config, "implementor", "provider/coder").expect("implementor");
+
+        let content = std::fs::read_to_string(&config).expect("read config");
+        let parsed: toml::Value = toml::from_str(&content).expect("parse config");
+        assert_eq!(parsed["ui"]["theme"].as_str(), Some("dark"));
+        assert_eq!(parsed["subagents"]["enabled"].as_bool(), Some(true));
+        assert_eq!(
+            parsed["subagents"]["models"]["architect"].as_str(),
+            Some("provider/architect")
+        );
+        assert_eq!(
+            parsed["subagents"]["models"]["plan"].as_str(),
+            Some("provider/architect")
+        );
+        assert_eq!(
+            parsed["subagents"]["models"]["implementor"].as_str(),
+            Some("provider/coder")
+        );
+        assert_eq!(
+            parsed["subagents"]["models"]["general-purpose"].as_str(),
+            Some("provider/coder")
+        );
+    }
+    #[test]
+    fn legion_assignment_rejects_unknown_role_without_writing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config = dir.path().join("config.toml");
+        let result = set_legion_role_model_at(&config, "rogue", "provider/model");
+        assert!(result.is_err());
+        assert!(!config.exists());
     }
     #[test]
     fn build_persona_list_from_details() {
@@ -2754,6 +3381,12 @@ mod tests {
                 persona_selected: 0,
                 persona_scroll: 0,
                 persona_expanded: std::collections::HashSet::new(),
+                legion_models: Vec::new(),
+                legion_assignments: HashMap::new(),
+                legion_selected_role: 0,
+                legion_picker_open: false,
+                legion_selected_model: 0,
+                legion_model_scroll: 0,
             };
             state.set_search_query(query);
             state
@@ -2795,6 +3428,12 @@ mod tests {
             persona_selected: selected,
             persona_scroll: 0,
             persona_expanded: std::collections::HashSet::new(),
+            legion_models: Vec::new(),
+            legion_assignments: HashMap::new(),
+            legion_selected_role: 0,
+            legion_picker_open: false,
+            legion_selected_model: 0,
+            legion_model_scroll: 0,
         };
         state.set_search_query(query);
         state

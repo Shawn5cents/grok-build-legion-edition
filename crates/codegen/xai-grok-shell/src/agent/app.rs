@@ -1624,6 +1624,23 @@ pub async fn run_leader(
                                 "Skills config change detected by watcher"
                             );
                         }
+                        ConfigUpdate::SubagentsChanged => {
+                            info!(
+                                "Subagent config change detected — reloading Legion assignments"
+                            );
+                            let line = internal_reload_request_line(
+                                "config-reload-subagents",
+                                "x.ai/internal/reload_subagents",
+                                serde_json::json!({}),
+                            );
+                            let mut tx = acp_tx_for_config.lock().await;
+                            if let Err(e) = tx.write_all(line.as_bytes()).await {
+                                warn!(
+                                    error = %e,
+                                    "failed to inject subagent config reload into ACP stream"
+                                );
+                            }
+                        }
                         ConfigUpdate::Compat(_compat) => {
                             info!(
                                 "Compat config change detected by watcher \

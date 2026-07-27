@@ -489,12 +489,21 @@ pub(super) fn dispatch_open_config_agents_modal(
     app: &mut AppView,
     initial_tab: Option<crate::views::agents_modal::AgentsTab>,
 ) -> Vec<Effect> {
-    use crate::views::agents_modal::{AgentsModalState, load_agent_toggle};
+    use crate::views::agents_modal::{AgentsModalState, LegionModelOption, load_agent_toggle};
 
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];
     };
     let bundle = app.bundle_state.clone();
+    let app_models: Vec<LegionModelOption> = app
+        .models
+        .available
+        .iter()
+        .map(|(id, info)| LegionModelOption {
+            id: id.0.to_string(),
+            name: info.name.clone(),
+        })
+        .collect();
     let Some(agent) = app.agents.get_mut(&id) else {
         return vec![];
     };
@@ -513,6 +522,20 @@ pub(super) fn dispatch_open_config_agents_modal(
         .and_then(model_agent_type_from_info);
     let session_id = agent.session.session_id.clone();
     let active_agent = agent.session_agent_name.clone();
+    let legion_models: Vec<LegionModelOption> = if agent.session.models.available.is_empty() {
+        app_models
+    } else {
+        agent
+            .session
+            .models
+            .available
+            .iter()
+            .map(|(id, info)| LegionModelOption {
+                id: id.0.to_string(),
+                name: info.name.clone(),
+            })
+            .collect()
+    };
     let mut modal = AgentsModalState::new(
         &cwd,
         &toggle,
@@ -520,6 +543,7 @@ pub(super) fn dispatch_open_config_agents_modal(
         model_agent_type.as_deref(),
         active_agent,
     );
+    modal.set_legion_models(legion_models);
     if let Some(tab) = initial_tab {
         modal.active_tab = tab;
     }

@@ -4,6 +4,7 @@ use super::ctx::with_active_agent;
 use super::queue::{maybe_drain_queue, note_peek_page_flip};
 use super::session::lifecycle::skip_picker_and_create_session;
 use super::settings::ui::{refresh_open_settings_modals, save_success_toast};
+use super::transcript::dispatch_open_config_agents_modal;
 use crate::app::actions::Effect;
 use crate::app::app_view::{ActiveView, AppView};
 use agent_client_protocol as acp;
@@ -470,11 +471,18 @@ pub(super) fn set_permission_mode(
         app.show_toast(&permission_mode_toast(kind));
     }
 
-    vec![Effect::PersistPermissionMode {
+    let mut effects = vec![Effect::PersistPermissionMode {
         canonical: kind.as_canonical(),
         session_id,
         persist: crate::app::actions::PermissionModePersist::WithRollback(prev_canonical),
-    }]
+    }];
+    if matches!(kind, crate::app::actions::PermissionModeKind::Legion) {
+        effects.extend(dispatch_open_config_agents_modal(
+            app,
+            Some(crate::views::agents_modal::AgentsTab::Legion),
+        ));
+    }
+    effects
 }
 
 /// Build the toast for a `permission_mode` commit. `AlwaysApprove`
@@ -772,6 +780,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
         // `session_id: None` skips the ACP yolo_mode_changed push (nothing to
         // notify yet; the created session takes its mode from the explicit
         // `_meta` seeds — see `SessionFlags::to_meta`).
+        let entered_legion = persist_canonical == Some("legion");
         if let Some(canonical) = persist_canonical {
             effects.push(Effect::PersistPermissionMode {
                 canonical,
@@ -780,6 +789,12 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             });
         }
         effects.extend(skip_picker_and_create_session(app, id));
+        if entered_legion {
+            effects.extend(dispatch_open_config_agents_modal(
+                app,
+                Some(crate::views::agents_modal::AgentsTab::Legion),
+            ));
+        }
         return effects;
     };
 
@@ -913,11 +928,16 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 a.show_mode_switch_banner("Legion Multi-Agent DAG");
             }
             tracing::info!("Mode cycle: Always-Approve → Legion Multi-Agent DAG");
-            vec![Effect::PersistPermissionMode {
+            let mut effects = vec![Effect::PersistPermissionMode {
                 canonical: "legion",
                 session_id: Some(session_id),
                 persist: crate::app::actions::PermissionModePersist::BestEffort,
-            }]
+            }];
+            effects.extend(dispatch_open_config_agents_modal(
+                app,
+                Some(crate::views::agents_modal::AgentsTab::Legion),
+            ));
+            effects
         }
         // Legion Multi-Agent DAG Mode → Normal
         (false, _, _, true) => {

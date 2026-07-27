@@ -93,6 +93,7 @@ Legion ships with intuitive interactive tools so you can configure models and pr
 
 | Command | Description |
 |---|---|
+| **Legion mode** *(Shift+Tab cycle or Settings → Permission mode)* | **In-TUI DAG Assignment Menu**: Selecting Legion opens the **Agents → Legion** tab, where `orchestrator`, `explore`, `architect`, `implementor`, and `verifier` can each be assigned any model from the live connected-provider catalog. Changes save immediately and hot-reload for subsequent subagent spawns. |
 | **`legion-hub`** *(or `legion hub`)* | **Ultimate Visual Control Panel**: Browse model catalog by context window, assign models to roles (`architect`, `implementor`), select presets, view live DAG topology, and launch sessions. |
 | **`legion-mode`** *(or `legion --mode`)* | **Preset Profile Switcher**: Instantly switch between profiles (`Legion DAG`, `Big Pickle DAG`, `Free Legion DAG`, `NVIDIA NIM DAG`, `Venice AI DAG`, `Cline/Codex`, `Auto-Discovered`) or run `legion-mode create` to build a custom preset. |
 | **`legion-config`** | **Model & Role Editor**: Interactively change models for individual subagent roles or apply **one single LLM to ALL roles at once** (`legion-config --all <model>`). |
