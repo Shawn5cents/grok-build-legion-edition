@@ -288,6 +288,7 @@ pub struct ConnectModalState {
     visible_start: usize,
     validation_rx: Option<mpsc::Receiver<Result<Vec<String>, String>>>,
     validation_key: Option<String>,
+    pending_catalog_models: Vec<(String, String)>,
 }
 
 impl Default for ConnectModalState {
@@ -311,6 +312,7 @@ impl ConnectModalState {
             visible_start: 0,
             validation_rx: None,
             validation_key: None,
+            pending_catalog_models: Vec::new(),
         }
     }
 
@@ -443,6 +445,11 @@ impl ConnectModalState {
                 let provider_name = provider.name;
                 match persist_validated_provider(provider, &api_key, &models) {
                     Ok(catalog_ids) => {
+                        self.pending_catalog_models = catalog_ids
+                            .iter()
+                            .zip(&models)
+                            .map(|(id, model)| (id.clone(), format!("{model} ({provider_name})")))
+                            .collect();
                         self.creds = load_credentials();
                         self.discovered_models = catalog_ids;
                         self.input_buffer.clear();
@@ -472,6 +479,16 @@ impl ConnectModalState {
 
     pub fn tick(&mut self) -> bool {
         self.poll_validation()
+    }
+
+    /// Drain models that were just persisted by a completed validation.
+    ///
+    /// The shell's config watcher remains the authoritative reload path, but
+    /// the pager consumes this one-shot projection immediately so `/model`
+    /// reflects a successful `/connect` without waiting for filesystem
+    /// debounce and an ACP notification round-trip.
+    pub fn take_pending_catalog_models(&mut self) -> Vec<(String, String)> {
+        std::mem::take(&mut self.pending_catalog_models)
     }
 
     pub fn handle_mouse(
@@ -855,6 +872,24 @@ mod tests {
             state.status_message.as_deref(),
             Some("Validation error: provider rejected the key")
         );
+    }
+
+    #[test]
+    fn configured_models_are_published_once_to_the_live_catalog() {
+        let mut state = ConnectModalState::new();
+        state.pending_catalog_models = vec![(
+            "provider/model-id".to_string(),
+            "model-id (Provider)".to_string(),
+        )];
+
+        assert_eq!(
+            state.take_pending_catalog_models(),
+            vec![(
+                "provider/model-id".to_string(),
+                "model-id (Provider)".to_string()
+            )]
+        );
+        assert!(state.take_pending_catalog_models().is_empty());
     }
 
     #[test]
