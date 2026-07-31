@@ -26,6 +26,9 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Install dotslash
+        run: cargo install dotslash --version 0.5.7 --locked
+
       - name: Cargo Check
         run: cargo check --workspace
 
@@ -72,6 +75,9 @@ jobs:
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
+
+      - name: Install dotslash
+        run: cargo install dotslash --version 0.5.7 --locked
 
       - name: Build Release Binary
         run: cargo build --release -p xai-grok-pager-bin
