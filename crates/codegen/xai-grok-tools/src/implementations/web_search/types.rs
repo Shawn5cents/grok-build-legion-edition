@@ -17,6 +17,10 @@ pub enum WebSearchConfig {
         extra_headers: IndexMap<String, String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         alpha_test_key: Option<String>,
+        #[serde(default)]
+        api_backend: Option<String>,
+        #[serde(default)]
+        auth_scheme: Option<String>,
     },
 }
 
@@ -37,6 +41,8 @@ impl WebSearchConfig {
                 base_url,
                 model,
                 extra_headers,
+                api_backend,
+                auth_scheme,
                 ..
             } => Self::Enabled {
                 api_key: "***REDACTED***".to_string(),
@@ -44,6 +50,8 @@ impl WebSearchConfig {
                 model: model.clone(),
                 extra_headers: extra_headers.clone(),
                 alpha_test_key: None,
+                api_backend: api_backend.clone(),
+                auth_scheme: auth_scheme.clone(),
             },
         }
     }
@@ -67,6 +75,8 @@ mod tests {
             model: "test-web-search-model".to_string(),
             extra_headers: IndexMap::new(),
             alpha_test_key: None,
+            api_backend: None,
+            auth_scheme: None,
         };
         assert!(config.is_enabled());
     }
@@ -81,6 +91,8 @@ mod tests {
             model: "test-web-search-model".to_string(),
             extra_headers: headers,
             alpha_test_key: Some("alpha-secret".to_string()),
+            api_backend: Some("responses".to_string()),
+            auth_scheme: None,
         };
         let redacted = config.redacted();
         match redacted {
@@ -90,12 +102,15 @@ mod tests {
                 model,
                 extra_headers,
                 alpha_test_key,
+                api_backend,
+                auth_scheme: _,
             } => {
                 assert_eq!(api_key, "***REDACTED***");
                 assert_eq!(base_url, "https://api.x.ai/v1");
                 assert_eq!(model, "test-web-search-model");
                 assert_eq!(extra_headers.get("X-Custom").unwrap(), "value");
                 assert!(alpha_test_key.is_none());
+                assert_eq!(api_backend.as_deref(), Some("responses"));
             }
             _ => panic!("Expected Enabled variant"),
         }
@@ -109,6 +124,8 @@ mod tests {
             model: "test-web-search-model".to_string(),
             extra_headers: IndexMap::new(),
             alpha_test_key: None,
+            api_backend: None,
+            auth_scheme: None,
         };
         let json = serde_json::to_string(&config).unwrap();
         let parsed: WebSearchConfig = serde_json::from_str(&json).unwrap();

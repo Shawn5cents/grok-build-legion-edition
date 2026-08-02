@@ -378,6 +378,15 @@ pub(crate) async fn spawn_session_actor(
                 model: cfg.model,
                 extra_headers: cfg.extra_headers,
                 alpha_test_key: credentials.alpha_test_key.clone(),
+                api_backend: Some(match cfg.api_backend {
+                    xai_grok_sampling_types::ApiBackend::ChatCompletions => "chat_completions".to_string(),
+                    xai_grok_sampling_types::ApiBackend::Responses => "responses".to_string(),
+                    xai_grok_sampling_types::ApiBackend::Messages => "messages".to_string(),
+                }),
+                auth_scheme: Some(match cfg.auth_scheme {
+                    xai_grok_sampler::config::AuthScheme::Bearer => "bearer".to_string(),
+                    xai_grok_sampler::config::AuthScheme::XApiKey => "x_api_key".to_string(),
+                }),
             }
         } else {
             tracing::warn!("web_search disabled: resolved config has no API key");
