@@ -4,13 +4,16 @@ use crate::types::SharedApiKeyProvider;
 use async_openai::types::responses as rs;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
 /// A minimal, purpose-built HTTP client for calling the Responses API
-/// with web search capability.
+/// with web search capability. Also supports Chat Completions API for
+/// providers that don't support the Responses API (e.g. DeepSeek).
 #[derive(Clone)]
 pub struct WebSearchClient {
     http: reqwest::Client,
     base_url: String,
     model: String,
     api_key_provider: Option<SharedApiKeyProvider>,
+    api_backend: Option<String>,
+    api_key: String,
     /// Optional 401-attribution hook. Callers can wire this so a 401
     /// from the Responses API emits an `auth_401_attribution` event
     /// with `consumer == "WebSearch"`.
@@ -30,6 +33,8 @@ impl WebSearchClient {
             model,
             extra_headers,
             alpha_test_key,
+            api_backend,
+            auth_scheme: _,
         } = config
         else {
             return Err(xai_tool_runtime::ToolError::execution(
@@ -79,6 +84,8 @@ impl WebSearchClient {
             model: model.clone(),
             api_key_provider,
             attribution_callback: None,
+            api_backend: api_backend.clone(),
+            api_key: api_key.clone(),
         })
     }
     /// Wire a 401-attribution callback into this client. Idempotent;
@@ -100,11 +107,22 @@ impl WebSearchClient {
             sent_bearer,
         );
     }
-    /// Perform a web search query using the Responses API.
+    /// Perform a web search query using the Responses API or Chat Completions API.
     ///
     /// Returns `(content, citations)` where content is the assistant's text
     /// and citations are unique URLs found in the response annotations.
     pub async fn search(
+        &self,
+        query: &str,
+        allowed_domains: Option<Vec<String>>,
+    ) -> Result<(String, Vec<String>), xai_tool_runtime::ToolError> {
+        if self.api_backend.as_deref() == Some("chat_completions") {
+            return self.search_chat_completions(query, allowed_domains).await;
+        }
+        self.search_responses(query, allowed_domains).await
+    }
+
+    async fn search_responses(
         &self,
         query: &str,
         allowed_domains: Option<Vec<String>>,
@@ -188,6 +206,106 @@ impl WebSearchClient {
         let citations = extract_citations(&response_obj);
         Ok((content, citations))
     }
+
+    async fn search_chat_completions(
+        &self,
+        query: &str,
+        allowed_domains: Option<Vec<String>>,
+    ) -> Result<(String, Vec<String>), xai_tool_runtime::ToolError> {
+        let mut tools = serde_json::json!([{
+            "type": "web_search",
+            "web_search": {}
+        }]);
+        if let Some(ref domains) = allowed_domains {
+            if !domains.is_empty() {
+                tools = serde_json::json!([{
+                    "type": "web_search",
+                    "web_search": {
+                        "user_location": {
+                            "type": "approximate",
+                            "country": "US"
+                        }
+                    }
+                }]);
+            }
+        }
+        let body = serde_json::json!({
+            "model": self.model,
+            "messages": [{
+                "role": "user",
+                "content": query
+            }],
+            "tools": tools,
+            "temperature": 0.1,
+            "top_p": 0.95,
+            "max_completion_tokens": 8192,
+            "stream": false
+        });
+        let url = format!(
+            "{}/chat/completions",
+            self.base_url.trim_end_matches('/')
+        );
+        let sent_bearer = self.current_bearer().await;
+        let auth_key = sent_bearer.as_deref().unwrap_or(&self.api_key);
+        let response = self
+            .http
+            .post(&url)
+            .header(AUTHORIZATION, format!("Bearer {auth_key}"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| {
+                xai_tool_runtime::ToolError::execution(
+                    xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+                    format!("HTTP request failed: {e}"),
+                )
+            })?;
+        let status = response.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            self.record_401_attribution(sent_bearer.as_deref());
+            let err_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            return Err(xai_tool_runtime::ToolError::unauthorized(format!(
+                "Chat Completions API returned 401 Unauthorized: {err_body}"
+            ))
+            .with_details(serde_json::json!({
+                "tool_id": "web_search",
+                "status": 401,
+            })));
+        }
+        if !status.is_success() {
+            let err_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            return Err(xai_tool_runtime::ToolError::execution(
+                xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+                format!("Chat Completions API returned {status}: {err_body}"),
+            ));
+        }
+        let body_bytes = response.bytes().await.map_err(|e| {
+            xai_tool_runtime::ToolError::execution(
+                xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+                format!("Failed to read response body: {e}"),
+            )
+        })?;
+        let response_json: serde_json::Value =
+            serde_json::from_slice(&body_bytes).map_err(|e| {
+                xai_tool_runtime::ToolError::execution(
+                    xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+                    format!("Failed to parse response: {e}"),
+                )
+            })?;
+        let content = response_json["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("No search results found.")
+            .to_string();
+        let citations = extract_citations_chat(&response_json);
+        Ok((content, citations))
+    }
+
     /// Same as [`Self::search`] but also extracts per-citation titles when
     /// the Responses API surfaces them. Returns `(content, citations_with_titles)`
     /// where each citation is `(title, url)`. Empty `title` strings indicate
@@ -196,6 +314,17 @@ impl WebSearchClient {
     /// Used by the cursor-compat `WebSearch` adapter to render a
     /// `Links:\n1. [title](url)` list instead of the LLM synthesis text.
     pub async fn search_with_titles(
+        &self,
+        query: &str,
+        allowed_domains: Option<Vec<String>>,
+    ) -> Result<(String, Vec<(String, String)>), xai_tool_runtime::ToolError> {
+        if self.api_backend.as_deref() == Some("chat_completions") {
+            return self.search_chat_completions_with_titles(query, allowed_domains).await;
+        }
+        self.search_responses_with_titles(query, allowed_domains).await
+    }
+
+    async fn search_responses_with_titles(
         &self,
         query: &str,
         allowed_domains: Option<Vec<String>>,
@@ -340,6 +469,138 @@ fn extract_citation_pairs(response: &rs::Response) -> Vec<(String, String)> {
     pairs.retain(|(_t, url)| seen.insert(url.clone()));
     pairs
 }
+
+fn extract_citations_chat(response: &serde_json::Value) -> Vec<String> {
+    let mut citations = Vec::new();
+    if let Some(annotations) = response["choices"][0]["message"]["annotations"].as_array() {
+        for annotation in annotations {
+            if annotation["type"].as_str() == Some("url_citation") {
+                if let Some(url) = annotation["url"].as_str() {
+                    citations.push(url.to_string());
+                }
+            }
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    citations.retain(|url| seen.insert(url.clone()));
+    citations
+}
+
+fn extract_citation_pairs_chat(response: &serde_json::Value) -> Vec<(String, String)> {
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    if let Some(annotations) = response["choices"][0]["message"]["annotations"].as_array() {
+        for annotation in annotations {
+            if annotation["type"].as_str() == Some("url_citation") {
+                let url = annotation["url"].as_str().unwrap_or("");
+                if url.is_empty() {
+                    continue;
+                }
+                let title = annotation["title"].as_str().unwrap_or("").to_string();
+                pairs.push((title, url.to_string()));
+            }
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    pairs.retain(|(_t, url)| seen.insert(url.clone()));
+    pairs
+}
+
+async fn search_chat_completions_with_titles_inner(
+    client: &WebSearchClient,
+    query: &str,
+    allowed_domains: Option<Vec<String>>,
+) -> Result<(String, Vec<(String, String)>), xai_tool_runtime::ToolError> {
+    let tools = serde_json::json!([{
+        "type": "web_search",
+        "web_search": {}
+    }]);
+    let _ = allowed_domains;
+    let body = serde_json::json!({
+        "model": client.model,
+        "messages": [{
+            "role": "user",
+            "content": query
+        }],
+        "tools": tools,
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "max_completion_tokens": 8192,
+        "stream": false
+    });
+    let url = format!(
+        "{}/chat/completions",
+        client.base_url.trim_end_matches('/')
+    );
+    let sent_bearer = client.current_bearer().await;
+    let auth_key = sent_bearer.as_deref().unwrap_or(&client.api_key);
+    let response = client
+        .http
+        .post(&url)
+        .header(AUTHORIZATION, format!("Bearer {auth_key}"))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| {
+            xai_tool_runtime::ToolError::execution(
+                xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+                format!("HTTP request failed: {e}"),
+            )
+        })?;
+    let status = response.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        client.record_401_attribution(sent_bearer.as_deref());
+        let err_body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error body".to_string());
+        return Err(xai_tool_runtime::ToolError::unauthorized(format!(
+            "Chat Completions API returned 401 Unauthorized: {err_body}"
+        ))
+        .with_details(serde_json::json!({
+            "tool_id": "web_search",
+            "status": 401,
+        })));
+    }
+    if !status.is_success() {
+        let err_body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error body".to_string());
+        return Err(xai_tool_runtime::ToolError::execution(
+            xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+            format!("Chat Completions API returned {status}: {err_body}"),
+        ));
+    }
+    let body_bytes = response.bytes().await.map_err(|e| {
+        xai_tool_runtime::ToolError::execution(
+            xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+            format!("Failed to read response body: {e}"),
+        )
+    })?;
+    let response_json: serde_json::Value =
+        serde_json::from_slice(&body_bytes).map_err(|e| {
+            xai_tool_runtime::ToolError::execution(
+                xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+                format!("Failed to parse response: {e}"),
+            )
+        })?;
+    let content = response_json["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("No search results found.")
+        .to_string();
+    let pairs = extract_citation_pairs_chat(&response_json);
+    Ok((content, pairs))
+}
+
+impl WebSearchClient {
+    async fn search_chat_completions_with_titles(
+        &self,
+        query: &str,
+        allowed_domains: Option<Vec<String>>,
+    ) -> Result<(String, Vec<(String, String)>), xai_tool_runtime::ToolError> {
+        search_chat_completions_with_titles_inner(self, query, allowed_domains).await
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,6 +617,8 @@ mod tests {
             model: "custom-enterprise-model".to_string(),
             extra_headers: IndexMap::new(),
             alpha_test_key: None,
+            api_backend: None,
+            auth_scheme: None,
         };
         let client = WebSearchClient::new(&config, None).expect("client should build");
         assert_eq!(client.model, "custom-enterprise-model");
@@ -386,6 +649,8 @@ mod tests {
             model: "test-model".to_string(),
             extra_headers: IndexMap::new(),
             alpha_test_key: None,
+            api_backend: None,
+            auth_scheme: None,
         };
         let client = WebSearchClient::new(&config, None)
             .expect("client should build")
@@ -410,6 +675,8 @@ mod tests {
             model: "test-model".to_string(),
             extra_headers: IndexMap::new(),
             alpha_test_key: None,
+            api_backend: None,
+            auth_scheme: None,
         };
         let client = WebSearchClient::new(&config, None).expect("client should build");
         client.record_401_attribution(Some("any-bearer"));
@@ -663,6 +930,8 @@ mod tests {
             model: "test-model".to_string(),
             extra_headers: IndexMap::new(),
             alpha_test_key: None,
+            api_backend: None,
+            auth_scheme: None,
         };
         let provider: SharedApiKeyProvider = std::sync::Arc::new(NoneProvider);
         let client = WebSearchClient::new(&config, Some(provider)).expect("client should build");
@@ -713,6 +982,8 @@ mod tests {
             model: "test-model".to_string(),
             extra_headers: IndexMap::new(),
             alpha_test_key: None,
+            api_backend: None,
+            auth_scheme: None,
         };
         let provider: SharedApiKeyProvider = std::sync::Arc::new(FreshProvider);
         let client = WebSearchClient::new(&config, Some(provider)).expect("client should build");
