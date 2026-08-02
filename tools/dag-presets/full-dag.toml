@@ -1,0 +1,108 @@
+# =============================================================================
+# DAG label: FULL  (aliases: max, flagship, best)
+# Use for: complex multi-file work, hard bugs, when economy is stuck
+# Cost: HIGH  |  Restart TUI required after:  dag full
+# =============================================================================
+# PRIMARY (Config D + xAI):
+#   main chat / orchestrator  grok-4.5            ([models] default — main window IS the orchestrator)
+#   explore                   deepseek-v4-flash
+#   plan / implementor        claude-opus-5
+#   architect                 gpt-5.6-sol
+#   verifier                  deepseek-v4-pro
+#   general-purpose           deepseek-v4-pro
+# Fallbacks are cross-vendor where it matters (see [subagents.fallback]).
+# AUTH: launch grok from a shell that sourced ~/.zshrc (all four API keys in process env).
+# =============================================================================
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "grok-4.5"
+explore = "deepseek-v4-flash"
+plan = "claude-opus-5"
+architect = "gpt-5.6-sol"
+implementor = "claude-opus-5"
+verifier = "deepseek-v4-pro"
+general-purpose = "deepseek-v4-pro"
+
+[subagents.fallback]
+orchestrator = "deepseek-v4-pro"
+explore = "gpt-5.6-luna"
+plan = "gpt-5.6-sol"
+architect = "grok-4.5"
+implementor = "deepseek-v4-pro"
+verifier = "grok-4.5"
+general-purpose = "gpt-5.6-luna"
+
+[model.deepseek-v4-pro]
+model = "deepseek-v4-pro"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Pro"
+env_key = ["DEEPSEEK_API_KEY"]
+context_window = 1000000
+
+[model.deepseek-v4-flash]
+model = "deepseek-v4-flash"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Flash"
+env_key = ["DEEPSEEK_API_KEY"]
+context_window = 1000000
+
+[model."claude-opus-5"]
+model = "claude-opus-5"
+base_url = "https://api.anthropic.com/v1"
+name = "Claude Opus 5"
+api_backend = "messages"
+env_key = ["ANTHROPIC_API_KEY"]
+env_http_headers = { "x-api-key" = "ANTHROPIC_API_KEY" }
+extra_headers = { "anthropic-version" = "2023-06-01" }
+context_window = 1000000
+
+[model."gpt-5.6-sol"]
+model = "gpt-5.6-sol"
+base_url = "https://api.openai.com/v1"
+name = "GPT-5.6 Sol"
+api_backend = "responses"
+env_key = ["OPENAI_API_KEY"]
+context_window = 1000000
+
+[model."gpt-5.6-luna"]
+model = "gpt-5.6-luna"
+base_url = "https://api.openai.com/v1"
+name = "GPT-5.6 Luna (cheap fallback)"
+api_backend = "responses"
+env_key = ["OPENAI_API_KEY"]
+context_window = 1000000
+
+# Quotes required — bare [model.grok-4.5] nests as grok-4 → 5 in TOML
+[model."grok-4.5"]
+model = "grok-4.5"
+base_url = "https://api.x.ai/v1"
+name = "Grok 4.5"
+env_key = ["XAI_API_KEY"]
+context_window = 1000000
+
+[marketplace]
+default_skills_installs_purged = true
+official_marketplace_auto_installed = true
+
+[[marketplace.sources]]
+name = "xAI Official"
+git = "https://github.com/xai-org/plugin-marketplace.git"
+
+[cli]
+installer = "internal"
+
+[ui]
+max_thoughts_width = 120
+fork_secondary_model = "deepseek-v4-pro"
+yolo = false
+compact_mode = false
+permission_mode = "always-approve"
+
+[features]
+remote_fetch = false
+
+[models]
+default = "grok-4.5"
