@@ -33,7 +33,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Install DotSlash
-        run: cargo install dotslash --version 0.5.9 --locked
+        run: cargo install dotslash --version 0.5.7 --locked
 
       - name: Install ripgrep
         run: |
@@ -90,7 +90,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install DotSlash
-        run: cargo install dotslash --version 0.5.9 --locked
+        run: cargo install dotslash --version 0.5.7 --locked
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
