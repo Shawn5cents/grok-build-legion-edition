@@ -92,14 +92,16 @@ fi
 
 if [ -n "${LEGION_BINARY:-}" ] && [ -x "$LEGION_BINARY" ]; then
     exec "$LEGION_BINARY" "$@"
-elif [ -x "$SCRIPT_DIR/xai-grok-pager" ]; then
-    exec "$SCRIPT_DIR/xai-grok-pager" "$@"
 elif [ -n "$REPO_DIR" ] && [ -x "$REPO_DIR/target/release/xai-grok-pager" ]; then
     exec "$REPO_DIR/target/release/xai-grok-pager" "$@"
 elif [ -n "$REPO_DIR" ] && [ -f "$REPO_DIR/Cargo.toml" ]; then
     echo "Building the Legion release binary..."
     (cd -- "$REPO_DIR" && cargo build --release -p xai-grok-pager-bin)
     exec "$REPO_DIR/target/release/xai-grok-pager" "$@"
+elif [ -x "$GROK_CONFIG_HOME/bin/legion" ]; then
+    exec "$GROK_CONFIG_HOME/bin/legion" "$@"
+elif [ -x "$SCRIPT_DIR/xai-grok-pager" ]; then
+    exec "$SCRIPT_DIR/xai-grok-pager" "$@"
 else
     echo "Error: xai-grok-pager is not installed." >&2
     echo "Re-run install.sh or set LEGION_BINARY to the compiled executable." >&2

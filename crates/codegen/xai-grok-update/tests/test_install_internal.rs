@@ -104,11 +104,18 @@ async fn install_internal_pinned_version_writes_binary_and_symlink() {
         format!("grok-0.1.181-{platform}").as_str()
     );
 
-    // `grok` and `agent` move together — see `swap_managed_bin_links`.
+    // All public entry points move together — see `swap_managed_bin_links`.
     let agent_link = home.join("bin").join("agent");
     assert!(agent_link.is_symlink(), "agent symlink created");
     let agent_target = std::fs::read_link(&agent_link).unwrap();
     assert_eq!(agent_target, target, "agent and grok point at same target");
+    let legion_link = home.join("bin").join("legion");
+    assert!(legion_link.is_symlink(), "legion symlink created");
+    let legion_target = std::fs::read_link(&legion_link).unwrap();
+    assert_eq!(
+        legion_target, target,
+        "legion and grok point at same target"
+    );
 }
 
 /// Regression: pre-existing `agent` symlink from a prior install must be

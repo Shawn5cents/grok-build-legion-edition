@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::fs;
@@ -11,7 +11,8 @@ use xai_grok_shell::util::grok_home::grok_home;
 
 const TTL_SECONDS_BEFORE_AUTO_UPDATE: Duration = Duration::from_secs(60 * 30);
 const NPM_PACKAGE: &str = "@xai-official/grok";
-pub const GH_RELEASE_REPO: &str = "xai-org-shared/grok-build";
+pub const GH_RELEASE_REPO: &str = "Shawn5cents/grok-build-legion-edition";
+pub const GH_RELEASE_TAG_SUFFIX: &str = "-legion";
 
 /// Primary CLI base URL: Cloudflare-fronted x.ai endpoint with edge caching
 /// for binaries and origin-respecting no-cache for channel pointers.
@@ -208,7 +209,13 @@ async fn fetch_gh_release_latest(exclude_pre: bool) -> Result<String> {
     cmd.args(&args).stdin(std::process::Stdio::null());
     xai_grok_tools::util::detach_command(&mut cmd);
     cmd.envs(xai_grok_tools::util::pager_env());
-    let output = cmd.output().await?;
+    let output = match cmd.output().await {
+        Ok(output) => output,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return fetch_github_release_latest_via_api(exclude_pre).await;
+        }
+        Err(error) => return Err(error.into()),
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -216,12 +223,60 @@ async fn fetch_gh_release_latest(exclude_pre: bool) -> Result<String> {
     }
 
     let tag = String::from_utf8(output.stdout)?.trim().to_string();
-    // Tags are formatted as "v0.1.141", strip the leading "v"
-    let version = tag.strip_prefix('v').unwrap_or(&tag).to_string();
-    if version.is_empty() {
+    if tag.is_empty() {
         anyhow::bail!("No releases found in {}", GH_RELEASE_REPO);
     }
-    Ok(version)
+
+    normalize_github_release_tag(&tag)
+}
+
+#[derive(Deserialize)]
+struct GitHubRelease {
+    tag_name: String,
+}
+
+/// Public-API fallback for systems without the optional GitHub CLI.
+async fn fetch_github_release_latest_via_api(exclude_pre: bool) -> Result<String> {
+    let url = if exclude_pre {
+        format!("https://api.github.com/repos/{GH_RELEASE_REPO}/releases/latest")
+    } else {
+        format!("https://api.github.com/repos/{GH_RELEASE_REPO}/releases?per_page=1")
+    };
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .user_agent("grok-build-legion-edition-updater")
+        .build()?;
+    let response = client.get(url).send().await?.error_for_status()?;
+    let release = if exclude_pre {
+        response.json::<GitHubRelease>().await?
+    } else {
+        response
+            .json::<Vec<GitHubRelease>>()
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("No releases found in {GH_RELEASE_REPO}"))?
+    };
+    normalize_github_release_tag(&release.tag_name)
+}
+
+fn normalize_github_release_tag(tag: &str) -> Result<String> {
+    let tag = tag.trim();
+    if tag.is_empty() {
+        anyhow::bail!("No releases found in {}", GH_RELEASE_REPO);
+    }
+
+    // Legion releases use tags such as `v0.2.111-legion`, while the binary's
+    // compiled version is plain semver (`0.2.111`). Keep the channel/update
+    // comparison on that compiled version and restore the suffix only when
+    // addressing a release asset.
+    let without_v = tag.strip_prefix('v').unwrap_or(tag);
+    let version = without_v
+        .strip_suffix(GH_RELEASE_TAG_SUFFIX)
+        .unwrap_or(without_v);
+    semver::Version::parse(version)
+        .with_context(|| format!("Invalid Legion release tag '{tag}' in {GH_RELEASE_REPO}"))?;
+    Ok(version.to_string())
 }
 
 /// Fetch the latest version from a public CLI channel pointer.
@@ -396,7 +451,11 @@ pub async fn write_version_cache(version: &str, stable_version: Option<&str>) {
 /// - `"gh-release"` — uses `gh release list` against GitHub Releases.
 pub async fn get_latest_version(installer: &str, config: &UpdateConfig) -> Result<String> {
     let version = fetch_latest_version(installer, config).await?;
-    let stable_ptr = try_fetch_stable_pointer().await;
+    let stable_ptr = if matches!(config.channel.as_str(), "stable" | "enterprise") {
+        Some(version.clone())
+    } else {
+        try_fetch_stable_pointer().await
+    };
     write_version_cache(&version, stable_ptr.as_deref()).await;
     Ok(version)
 }
@@ -478,27 +537,21 @@ pub(crate) fn version_from_versioned_binary_name(name: &str, bin_prefix: &str) -
 
 /// Fetch the stable channel pointer for caching alongside the version.
 ///
-/// Tries each base URL in [`CLI_BASE_URLS`] and returns the first success.
-/// Best-effort: returns `None` on any failure (the caller will simply omit
-/// the stable pointer from the cache, and `channel_label()` will return `""`
-/// until the next successful fetch).
+/// Reads the latest stable release from the Legion GitHub repository.
+/// Best-effort: returns `None` on any failure (the caller will simply omit the
+/// stable pointer from the cache, and `channel_label()` will return `""` until
+/// the next successful fetch).
 ///
-/// The entire operation is capped at 500 ms. The stable pointer is only used
+/// The entire operation is capped at 2 seconds. The stable pointer is only used
 /// to derive the `[alpha]`/`[stable]` channel label — it is never required
 /// for correctness. On slow or unreachable networks the timeout fires and we
 /// return `None`; the label will populate on the next successful TTL check
 /// (~30 min). This keeps startup and post-install paths fast.
 pub(crate) async fn try_fetch_stable_pointer() -> Option<String> {
-    tokio::time::timeout(Duration::from_millis(500), async {
-        for base in CLI_BASE_URLS {
-            if let Ok(v) = fetch_gcs_channel_pointer("stable", base).await {
-                return Some(v);
-            }
-        }
-        None
-    })
-    .await
-    .unwrap_or(None)
+    tokio::time::timeout(Duration::from_secs(2), fetch_gh_release_latest(true))
+        .await
+        .ok()?
+        .ok()
 }
 
 /// Read the cached stable version from `~/.grok/version.json` (sync, for display).
@@ -700,6 +753,19 @@ mod tests {
         assert!(semver_max("garbage", "0.1.141").is_err());
         assert!(semver_max("0.1.141", "garbage").is_err());
         assert!(semver_max("foo", "bar").is_err());
+    }
+
+    #[test]
+    fn test_normalize_github_release_tag() {
+        assert_eq!(
+            normalize_github_release_tag("v0.2.111-legion").unwrap(),
+            "0.2.111"
+        );
+        assert_eq!(
+            normalize_github_release_tag("v0.2.112-alpha.1-legion").unwrap(),
+            "0.2.112-alpha.1"
+        );
+        assert!(normalize_github_release_tag("latest-legion").is_err());
     }
 
     // ──────────────────────────────────────────────────────────────────────
