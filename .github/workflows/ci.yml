@@ -1,10 +1,18 @@
-name: Legion Edition 2.0 CI/CD
+name: Legion CI
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legion-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,6 +21,7 @@ jobs:
   rust-check:
     name: 🦀 Rust Code Quality & Build
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -41,6 +50,7 @@ jobs:
   python-tools-check:
     name: 🐍 Python Auto-Discovery Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -65,6 +75,7 @@ jobs:
   release-binary-build:
     name: 📦 Release Binary Build Verification
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
