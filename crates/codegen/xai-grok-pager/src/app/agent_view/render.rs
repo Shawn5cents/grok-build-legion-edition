@@ -29,7 +29,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 /// AppView-owned per-frame inputs to [`AgentView::draw`] — state the agent
 /// view cannot see itself (the voice pipeline and app-level Esc ownership).
@@ -2088,12 +2088,27 @@ impl AgentView {
                 .hit_legal
                 .set_unless_dropdown(Some(rects.legal), dropdown_open);
         } else if banner.legion_dag_banner {
+            let base_model = self
+                .session
+                .models
+                .current_model_id_str()
+                .unwrap_or("unassigned");
             let widget = crate::views::legion_dag_banner::LegionDagBanner::new(
-                "deepseek-v4-pro",
-                "deepseek-v4-flash",
-                "nemotron-3-ultra",
-                "MiniMax-M3",
-                "grok-4.5",
+                assigned_legion_model(&self.legion_assignments, "orchestrator", None, base_model),
+                assigned_legion_model(&self.legion_assignments, "explore", None, base_model),
+                assigned_legion_model(
+                    &self.legion_assignments,
+                    "architect",
+                    Some("plan"),
+                    base_model,
+                ),
+                assigned_legion_model(
+                    &self.legion_assignments,
+                    "implementor",
+                    Some("general-purpose"),
+                    base_model,
+                ),
+                assigned_legion_model(&self.legion_assignments, "verifier", None, base_model),
             );
             ratatui::widgets::Widget::render(widget, layout.banner, buf);
         } else if let Some((ref msg, remaining)) = self.mode_switch_banner {
@@ -4338,6 +4353,51 @@ fn fit_toast_text(msg: &str, avail_width: u16) -> Option<String> {
     }
     let truncated: String = msg.chars().take(max_msg_chars.saturating_sub(1)).collect();
     Some(format!(" {}… ", truncated.trim_end()))
+}
+
+fn assigned_legion_model<'a>(
+    assignments: &'a HashMap<String, String>,
+    role: &str,
+    legacy_alias: Option<&str>,
+    base_model: &'a str,
+) -> &'a str {
+    assignments
+        .get(role)
+        .or_else(|| legacy_alias.and_then(|alias| assignments.get(alias)))
+        .map(String::as_str)
+        .unwrap_or(base_model)
+}
+
+#[cfg(test)]
+mod legion_model_tests {
+    use super::assigned_legion_model;
+    use std::collections::HashMap;
+
+    #[test]
+    fn dag_labels_follow_selected_roles_aliases_and_base_fallback() {
+        let assignments = HashMap::from([
+            ("orchestrator".to_string(), "orch-selected".to_string()),
+            ("explore".to_string(), "explore-selected".to_string()),
+            ("plan".to_string(), "architect-legacy".to_string()),
+        ]);
+
+        assert_eq!(
+            assigned_legion_model(&assignments, "orchestrator", None, "base"),
+            "orch-selected"
+        );
+        assert_eq!(
+            assigned_legion_model(&assignments, "explore", None, "base"),
+            "explore-selected"
+        );
+        assert_eq!(
+            assigned_legion_model(&assignments, "architect", Some("plan"), "base"),
+            "architect-legacy"
+        );
+        assert_eq!(
+            assigned_legion_model(&assignments, "verifier", None, "base"),
+            "base"
+        );
+    }
 }
 #[cfg(test)]
 mod toast_fit_tests {

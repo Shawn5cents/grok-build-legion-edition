@@ -880,6 +880,7 @@ pub(in crate::app::dispatch) fn handle_session_loaded(
     restore_degree: Option<xai_grok_workspace::session::git::RestoreDegree>,
     running_prompt_id: Option<String>,
 ) -> Vec<Effect> {
+    let legion_active = crate::app::dispatch::legion::is_active(app);
     tracing::info!(
         "Session loaded for agent {:?} session {:?}",
         agent_id,
@@ -907,6 +908,14 @@ pub(in crate::app::dispatch) fn handle_session_loaded(
             agent,
             app.cli_effort_token.as_deref(),
         );
+        let deferred = if legion_active {
+            crate::app::dispatch::legion::orchestrator_model(agent).and_then(|model_id| {
+                (agent.session.models.current.as_ref() != Some(&model_id))
+                    .then_some((model_id, None))
+            })
+        } else {
+            deferred
+        };
         match (code_restored, restore_summary.as_deref()) {
             (true, Some(s)) => {
                 agent

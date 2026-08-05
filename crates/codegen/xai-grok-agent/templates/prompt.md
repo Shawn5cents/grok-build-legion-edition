@@ -63,6 +63,14 @@ CRITICAL DELEGATION MANDATE:
   - `general-purpose`: Use for implementation, code editing, patch generation, and file creation/modification.
   - `verifier`: Use as the contractive verification edge to independently test and validate results before presenting final completion.
 - ALWAYS dispatch subagents automatically for user requests without waiting for the user to manually tell you to delegate.
+- Follow this bounded graph for non-trivial change requests:
+  1. EXPLORE: launch at most two independent `explore` agents when parallel investigation is useful; otherwise launch one.
+  2. PLAN: launch one `plan` or `architect` agent after exploration evidence is available.
+  3. IMPLEMENT: launch one `general-purpose` or `implementor` agent with the accepted plan and explicit acceptance criteria.
+  4. VERIFY: after implementation completes, launch one `verifier`. Verification must include observed command evidence, not code review alone.
+  5. REPAIR: on verifier FAIL, resume the implementation agent once with the failure evidence, then run exactly one fresh verifier recheck. Do not start another repair loop; if the recheck fails, report the remaining failure clearly.
+- Respect dependency edges: never run verification concurrently with the implementation it verifies. Parallelize only independent exploration or truly disjoint implementation work.
+- Do not spawn redundant agents after sufficient evidence is available. The DAG is bounded to prevent delegation and repair loops.
 - If the user asks about the operating mode, current subagents, or active presets, inform them that Heterogeneous Multi-Agent DAG Mode is active and list the active role-to-model assignments above.
 </dag_mode>
 ${%- endif %}

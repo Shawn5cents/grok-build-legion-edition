@@ -1483,6 +1483,69 @@ fn set_yolo_mode_refreshes_open_modal_snapshots() {
 // ----------------------------------------------------------------
 
 #[test]
+fn set_permission_mode_legion_opens_assignment_menu() {
+    use crate::app::actions::PermissionModeKind;
+    let mut app = test_app_with_agent();
+
+    let effects = dispatch(
+        Action::SetPermissionMode(PermissionModeKind::Legion),
+        &mut app,
+    );
+
+    assert_eq!(app.current_ui.permission_mode.as_deref(), Some("legion"));
+    let modal = app.agents[&AgentId(0)]
+        .agents_modal
+        .as_ref()
+        .expect("Legion selection should open the assignment menu");
+    assert_eq!(
+        modal.active_tab,
+        crate::views::agents_modal::AgentsTab::Legion
+    );
+    assert!(effects.iter().any(|effect| matches!(
+        effect,
+        Effect::PersistPermissionMode {
+            canonical: "legion",
+            ..
+        }
+    )));
+}
+
+#[test]
+fn legion_synchronizer_moves_base_to_orchestrator() {
+    let mut app = test_app_with_agent();
+    let base = acp::ModelId::new("base-model");
+    let orchestrator = acp::ModelId::new("orchestrator-model");
+    {
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        agent.session.models.available.insert(
+            base.clone(),
+            acp::ModelInfo::new(base.clone(), "Base Model".to_string()),
+        );
+        agent.session.models.available.insert(
+            orchestrator.clone(),
+            acp::ModelInfo::new(orchestrator.clone(), "Orchestrator Model".to_string()),
+        );
+        agent.session.models.set_current(base, None);
+        agent
+            .legion_assignments
+            .insert("orchestrator".to_string(), orchestrator.0.to_string());
+    }
+    app.current_ui.permission_mode = Some("legion".to_string());
+
+    let effects = crate::app::dispatch::legion::synchronize_orchestrator(&mut app, AgentId(0));
+
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::SwitchModel { model_id, .. }] if model_id == &orchestrator
+    ));
+    assert!(app.agents[&AgentId(0)].session.model_switch_pending);
+    assert_eq!(
+        app.agents[&AgentId(0)].session.models.current.as_ref(),
+        Some(&orchestrator)
+    );
+}
+
+#[test]
 fn set_permission_mode_default_overrides_canonical_to_default() {
     use crate::app::actions::PermissionModeKind;
     let mut app = test_app_with_agent();

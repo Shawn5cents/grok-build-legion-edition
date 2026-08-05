@@ -102,7 +102,7 @@ are highly capable \u{2014} treat them as expert peers, not junior helpers. Give
 quality of context and direction you would give a senior engineer joining the project.
 
 Your job is to think, plan, coordinate, and review. Their job is to explore, implement, \
-and execute. Use them aggressively and liberally \u{2014} spawn subagents early and often.
+execute, and verify. Delegate deliberately through a bounded dependency graph.
 
 ### Your direct responsibilities:
 - High-level planning and architecture decisions
@@ -116,7 +116,7 @@ and execute. Use them aggressively and liberally \u{2014} spawn subagents early 
 
 ### ALWAYS delegate to subagents:
 - **ALL file modifications** \u{2014} creating, editing, deleting files (`general-purpose`)
-- **ALL builds, tests, and verification** \u{2014} running test suites, linters, compilers (`general-purpose`)
+- **ALL builds, tests, and verification** \u{2014} implementors may self-check, but final independent validation belongs to `verifier`
 - **Deep codebase exploration** \u{2014} searching across many files, understanding patterns (`explore`)
 - **Multi-step implementation** \u{2014} any task involving more than reading (`general-purpose`)
 - **Any research requiring thoroughness** \u{2014} don\u{2019}t do shallow searches yourself, spawn an `explore` subagent
@@ -130,15 +130,23 @@ Write prompts the way you would brief a senior engineer:
 - Include acceptance criteria: what does \"done\" look like?
 
 ### Parallelism:
-- Break independent tasks into separate subagents and run them in parallel
-- Use `explore` subagents to investigate multiple areas simultaneously
-- Launch implementation subagents for independent files/modules at the same time
-- Do NOT wait for one subagent before spawning others that don\u{2019}t depend on it
+- Run at most two `explore` agents in parallel when they investigate independent questions
+- Parallelize only tasks with no dependency edge between them
+- Never verify concurrently with the implementation being verified
+
+### Bounded execution graph for change requests:
+1. Explore with one agent, or at most two independent agents when useful.
+2. Plan once using the exploration evidence.
+3. Implement once with explicit acceptance criteria.
+4. Verify once with the `verifier`; require observed tests, builds, linters, or endpoint probes as appropriate.
+5. If verification returns FAIL, resume the implementor once with the failure evidence, then launch one fresh verifier recheck.
+6. Stop after that recheck. Report remaining failures instead of creating an unbounded repair loop.
 
 ### Anti-patterns to avoid:
 - Do NOT do shallow 1-2 file reads yourself when an `explore` agent would be more thorough
 - Do NOT implement code changes yourself \u{2014} you have no file editing tools
 - Do NOT give subagents overly prescriptive step-by-step instructions \u{2014} trust their expertise
+- Do NOT spawn redundant agents after the graph has enough evidence to advance
 - Do NOT summarize or re-explain what the user said \u{2014} get to work immediately";
 /// Bash tool with clearer model-facing names:
 /// `run_terminal_cmd` → `run_terminal_command`, `is_background` → `background`.
@@ -386,6 +394,23 @@ fn plan_toolset() -> ToolServerConfig {
             // (&grok_build::SkillTool).into(),
             (&grok_build::TodoWriteTool).into(),
             // search_replace + run_terminal_command intentionally omitted (read-only)
+        ],
+        behavior_preset: None,
+    }
+}
+/// Non-editing verifier toolset. Unlike `explore_toolset`, this includes Bash
+/// and its background-task controls so the verifier can run tests, builds,
+/// linters, and endpoint probes. Direct file-editing tools remain absent.
+fn verifier_toolset() -> ToolServerConfig {
+    ToolServerConfig {
+        tools: vec![
+            bash_tool_config(),
+            (&grok_build::ReadFileTool).into(),
+            (&grok_build::ListDirTool).into(),
+            (&grok_build::GrepTool).into(),
+            task_output_tool_config(),
+            wait_tasks_tool_config(),
+            kill_task_tool_config(),
         ],
         behavior_preset: None,
     }
@@ -673,8 +698,8 @@ where
 /// are defined in exactly one place. The enum covers all built-in
 /// agents for centralized name management and `by_name()` dispatch.
 ///
-/// `subagent_variants()` returns only the 3 that are exposed to the LLM
-/// via the `TaskTool` description. The remaining 6 are top-level agent
+/// `subagent_variants()` returns the worker profiles exposed to the LLM via
+/// the `TaskTool` description. The remaining variants are top-level agent
 /// profiles resolvable by name but not advertised as subagent types.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, EnumIter, AsRefStr, IntoStaticStr,
@@ -1626,10 +1651,12 @@ impl AgentDefinition {
     }
     /// Verifier subagent — read-only contractive evaluator.
     pub fn verifier() -> Self {
+        use crate::prompt::subagent_prompts;
         Self {
-            description: "Contractive verifier edge for reviewing code and validating changes without modifying files".to_string(),
-            tool_config: explore_toolset(),
+            description: "Contractive verifier edge that can run tests, builds, linters, and endpoint probes without editing files".to_string(),
+            tool_config: verifier_toolset(),
             permission_mode: PermissionMode::Plan,
+            prompt_body: Some(subagent_prompts::VERIFIER_PROMPT.to_string()),
             inherit_skills: false,
             ..Self::base(BuiltinAgentName::Verifier, "")
         }
@@ -2551,6 +2578,36 @@ description: Test default tool config
         assert!(variants.contains(&BuiltinAgentName::Architect));
         assert!(variants.contains(&BuiltinAgentName::Implementor));
         assert!(variants.contains(&BuiltinAgentName::Verifier));
+    }
+    #[test]
+    fn verifier_can_execute_checks_but_has_no_edit_tools() {
+        let def = AgentDefinition::verifier();
+        let ids: Vec<&str> = def
+            .tool_config
+            .tools
+            .iter()
+            .map(|tool| tool.id.as_str())
+            .collect();
+        let bash_id = ToolConfig::from(&grok_build::BashTool).id;
+        let edit_id = ToolConfig::from(&grok_build::SearchReplaceTool).id;
+        let write_id = ToolConfig::from(&opencode::OpenCodeWriteTool).id;
+        assert!(
+            ids.contains(&bash_id.as_str()),
+            "verifier must be able to run checks"
+        );
+        assert!(
+            !ids.contains(&edit_id.as_str()),
+            "verifier must not edit files"
+        );
+        assert!(
+            !ids.contains(&write_id.as_str()),
+            "verifier must not write files"
+        );
+        assert!(
+            def.prompt_body
+                .as_deref()
+                .is_some_and(|prompt| prompt.contains("Do not claim a check ran"))
+        );
     }
     #[test]
     fn test_all_builtins_have_inherit_model() {

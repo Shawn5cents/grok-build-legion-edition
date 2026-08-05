@@ -988,6 +988,33 @@ mod tests {
         assert!(found, "should detect config.toml change");
     }
 
+    #[test]
+    #[cfg_attr(
+        target_os = "macos",
+        ignore = "flaky on macOS: FSEvents does not reliably deliver events in test harness"
+    )]
+    fn watcher_detects_atomic_config_toml_change() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("config.toml");
+        fs::write(&path, "").unwrap();
+
+        let (_w, mut rx) =
+            ConfigFileWatcher::start(tmp.path(), &[], None, Some(Duration::from_millis(50)))
+                .expect("watcher should start");
+
+        xai_grok_config::fs_atomic::write_atomically(&path, "[ui]\ntheme = \"dark\"", Some(0o600))
+            .unwrap();
+        wait_ms(300);
+
+        let mut found = false;
+        while let Ok(evt) = rx.try_recv() {
+            if evt == ConfigChangeEvent::GlobalConfigChanged {
+                found = true;
+            }
+        }
+        assert!(found, "an atomic config write must be detected");
+    }
+
     /// A write to `<grok_home>/models_cache.json` must surface as
     /// `ConfigChangeEvent::ModelsCacheChanged` so a long-running leader can
     /// hot-load a catalog fetched by another grok process.

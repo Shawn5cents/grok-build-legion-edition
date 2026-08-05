@@ -4527,8 +4527,13 @@ impl AppView {
                             let show_session_tip =
                                 !privacy_banner && self.tip.is_some() && agent.should_show_tip();
                             let has_mode_banner = agent.mode_switch_banner.is_some();
+                            let legion_dag_banner = self.show_legion_dag_banner
+                                && self.current_ui.permission_mode.as_deref() == Some("legion");
                             let banner_height = if privacy_banner {
                                 2
+                            } else if legion_dag_banner {
+                                // Border + two rows of live DAG role/model assignments.
+                                4
                             } else if has_mode_banner {
                                 1
                             } else if announcement_banner_h > 0 {
@@ -4550,9 +4555,7 @@ impl AppView {
                                     announcements: &self.active_announcements,
                                     hidden_ids: &self.hidden_announcement_ids,
                                     privacy_banner,
-                                    legion_dag_banner: self.show_legion_dag_banner
-                                        && self.current_ui.permission_mode.as_deref()
-                                            == Some("legion"),
+                                    legion_dag_banner,
                                     mouse_pos: agent_mouse_pos,
                                     tip: if show_session_tip {
                                         self.tip.as_deref()
@@ -5087,14 +5090,33 @@ impl AppView {
                 needs_redraw |= child.edit_hl_tick();
             }
         }
+        let mut connected_models = Vec::new();
+        if let ActiveView::Agent(id) = self.active_view
+            && let Some(agent) = self.agents.get_mut(&id)
+            && let Some(crate::views::modal::ActiveModal::Connect { state }) =
+                agent.active_modal.as_mut()
+        {
+            needs_redraw |= state.tick();
+            connected_models = state.take_pending_catalog_models();
+        }
+        if !connected_models.is_empty() {
+            for (id, name) in connected_models {
+                let id = agent_client_protocol::ModelId::new(std::sync::Arc::from(id));
+                let info = agent_client_protocol::ModelInfo::new(id.clone(), name);
+                self.models.available.insert(id.clone(), info.clone());
+                for agent in self.agents.values_mut() {
+                    agent
+                        .session
+                        .models
+                        .available
+                        .insert(id.clone(), info.clone());
+                }
+            }
+            needs_redraw = true;
+        }
         if let ActiveView::Agent(id) = self.active_view
             && let Some(agent) = self.agents.get_mut(&id)
         {
-            if let Some(crate::views::modal::ActiveModal::Connect { state }) =
-                agent.active_modal.as_mut()
-            {
-                needs_redraw |= state.tick();
-            }
             needs_redraw |= agent.scrollback.tick();
             needs_redraw |= agent.todo.list_state.tick();
             needs_redraw |= agent.todo.badge_tick();

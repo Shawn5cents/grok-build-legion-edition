@@ -1212,6 +1212,9 @@ pub struct AgentView {
     /// Active agents modal popup. When `Some`, blocks all input and
     /// renders as a centered overlay. Opened by `/config-agents` or `/agents`.
     pub(crate) agents_modal: Option<crate::views::agents_modal::AgentsModalState>,
+    /// Effective Legion role-to-model assignments used by the DAG banner and
+    /// orchestrator/base-model synchronization.
+    pub(crate) legion_assignments: HashMap<String, String>,
     pub(crate) persona_detail: Option<crate::views::persona_detail::PersonaDetailState>,
     /// Active /btw side question overlay. When `Some`, renders as a dismissible
     /// overlay and captures keyboard input (Esc/Enter/Space to dismiss).

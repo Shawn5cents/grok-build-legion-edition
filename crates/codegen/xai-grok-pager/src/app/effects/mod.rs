@@ -1983,6 +1983,54 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::PersistLegionRoleModel { role, model_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let result = tokio::task::spawn_blocking(move || {
+                    crate::views::agents_modal::set_legion_role_model(&role, &model_id)
+                })
+                .await;
+                let persisted = matches!(&result, Ok(Ok(())));
+                match result {
+                    Ok(Err(error)) => {
+                        tracing::warn!(%error, "failed to persist Legion role model");
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, "failed to persist Legion role model: join error");
+                    }
+                    Ok(Ok(())) => {}
+                }
+                if persisted {
+                    let params = serde_json::json!({});
+                    let request = acp::ExtRequest::new(
+                        "x.ai/internal/reload_subagents",
+                        serde_json::value::to_raw_value(&params)
+                            .expect("serialize Legion reload params")
+                            .into(),
+                    );
+                    if let Err(error) = acp_send(request, &tx).await {
+                        tracing::warn!(%error, "failed to reload restored Legion assignments");
+                    }
+                }
+                TaskResult::CancelComplete
+            });
+        }
+        Effect::ReloadLegionAssignments => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let params = serde_json::json!({});
+                let request = acp::ExtRequest::new(
+                    "x.ai/internal/reload_subagents",
+                    serde_json::value::to_raw_value(&params)
+                        .expect("serialize Legion reload params")
+                        .into(),
+                );
+                if let Err(error) = acp_send(request, &tx).await {
+                    tracing::warn!(%error, "failed to reload live Legion assignments");
+                }
+                TaskResult::CancelComplete
+            });
+        }
         Effect::PersistPermissionMode { canonical, session_id, persist } => {
             let tx = acp_tx.clone();
             tasks

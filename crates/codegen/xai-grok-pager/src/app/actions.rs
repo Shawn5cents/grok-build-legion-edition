@@ -402,6 +402,11 @@ pub enum Action {
         model_id: acp::ModelId,
         effort: Option<ReasoningEffort>,
     },
+    /// A model was assigned to a Legion DAG role in the Agents modal.
+    LegionRoleModelAssigned {
+        role: String,
+        model_id: acp::ModelId,
+    },
     /// Cancel the currently running turn.
     CancelTurn,
     /// User confirmed a cancel-turn choice from the panel.
@@ -1603,6 +1608,10 @@ pub enum Effect {
         model_id: acp::ModelId,
         reasoning_effort: Option<ReasoningEffort>,
     },
+    /// Persist a Legion DAG role model to `[subagents.models]`.
+    PersistLegionRoleModel { role: String, model_id: String },
+    /// Reload persisted Legion role assignments into the live shell config.
+    ReloadLegionAssignments,
     /// Persist the permission mode to config.toml and notify the agent
     /// via ACP. See [`PermissionModePersist`] for rollback semantics.
     PersistPermissionMode {

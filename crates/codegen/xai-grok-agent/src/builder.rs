@@ -1272,7 +1272,13 @@ fn builtin_tools_fragment(name: BuiltinAgentName) -> String {
         BuiltinAgentName::GeneralPurpose | BuiltinAgentName::Implementor => {
             xai_tool_types::GENERAL_PURPOSE_SUBAGENT
         }
-        BuiltinAgentName::Explore | BuiltinAgentName::Verifier => xai_tool_types::EXPLORE_SUBAGENT,
+        BuiltinAgentName::Explore => xai_tool_types::EXPLORE_SUBAGENT,
+        BuiltinAgentName::Verifier => {
+            return "Non-editing verifier — can run commands and inspect files: \
+                    ${{ tools.by_kind.execute }}, ${{ tools.by_kind.read }}, \
+                    ${{ tools.by_kind.list }}, ${{ tools.by_kind.search }}."
+                .to_string();
+        }
         BuiltinAgentName::Plan | BuiltinAgentName::Architect => xai_tool_types::PLAN_SUBAGENT,
         _ => return String::new(),
     };

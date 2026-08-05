@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a reproducible Legion problem
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Legion. Remove credentials, tokens, private URLs, and personal data before submitting.
+  - type: input
+    id: version
+    attributes:
+      label: Legion version
+      description: Output of `legion --version`
+      placeholder: grok 0.2.112 (abcdef0) [stable]
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: Ubuntu 24.04 x86_64
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation method
+      options:
+        - Built with install.sh
+        - GitHub release binary
+        - Other source build
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Run ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs or screenshots
+      description: Do not include secrets or private configuration.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials, tokens, private URLs, and personal data.
+          required: true

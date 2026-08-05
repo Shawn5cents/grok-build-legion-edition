@@ -209,6 +209,9 @@ pub(crate) struct SubagentSpawnContext {
     pub available_models: indexmap::IndexMap<String, crate::agent::config::ModelEntry>,
     /// Per-subagent model ID overrides from config.toml `[subagents.models]`.
     pub subagent_model_overrides: std::collections::HashMap<String, String>,
+    /// Per-subagent fallback model IDs from config.toml
+    /// `[subagents.fallback]`. Applied once after a terminal HTTP 429.
+    pub subagent_model_fallbacks: std::collections::HashMap<String, String>,
     /// Per-subagent enable/disable toggles from config.toml `[subagents.toggle]`.
     /// Omitted agents default to enabled (`true`).
     pub subagent_toggle: std::collections::HashMap<String, bool>,
@@ -1705,6 +1708,16 @@ fn resolve_subagent_source_repo(ctx: &SubagentSpawnContext) -> std::path::PathBu
 enum SubagentWaitOutcome {
     Cancelled,
     TurnResult(Box<Result<SubagentPromptTurnResult, oneshot::error::RecvError>>),
+}
+fn is_rate_limited_prompt_error(error: &acp::Error) -> bool {
+    i32::from(error.code) == crate::sampling::error::RATE_LIMITED_ERROR_CODE
+}
+fn is_rate_limited_wait_outcome(outcome: &SubagentWaitOutcome) -> bool {
+    matches!(
+        outcome,
+        SubagentWaitOutcome::TurnResult(result)
+            if matches!(result.as_ref(), Ok(Err(error)) if is_rate_limited_prompt_error(error))
+    )
 }
 async fn await_subagent_turn_or_cancellation(
     prompt_rx: oneshot::Receiver<SubagentPromptTurnResult>,

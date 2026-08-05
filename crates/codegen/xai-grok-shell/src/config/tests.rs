@@ -1129,6 +1129,28 @@ fn subagents_config_models_empty_when_missing() {
         assert!(sa.models.is_empty());
     });
 }
+
+#[test]
+fn subagents_config_fallbacks_parsed() {
+    without_grok_subagents(|| {
+        let config: toml::Value = toml::from_str(
+            r#"
+                [subagents.models]
+                verifier = "grok-4.5"
+
+                [subagents.fallback]
+                verifier = "deepseek-v4-pro"
+                "#,
+        )
+        .unwrap();
+        let sa = SubagentsConfig::resolve(false, &config);
+        assert_eq!(sa.models.get("verifier").map(String::as_str), Some("grok-4.5"));
+        assert_eq!(
+            sa.fallback.get("verifier").map(String::as_str),
+            Some("deepseek-v4-pro")
+        );
+    });
+}
 #[test]
 fn subagents_config_models_without_enabled() {
     without_grok_subagents(|| {

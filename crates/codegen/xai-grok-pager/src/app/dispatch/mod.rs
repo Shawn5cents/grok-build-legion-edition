@@ -22,6 +22,7 @@ pub(crate) mod external_editor;
 mod import_claude;
 mod interject;
 mod jump;
+pub(crate) mod legion;
 mod modes;
 mod notes;
 mod permissions;

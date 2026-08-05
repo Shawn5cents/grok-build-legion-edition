@@ -3406,7 +3406,8 @@ impl acp::Agent for MvpAgent {
             | "x.ai/session/update_mcp_servers" | "x.ai/session/fork"
             | "x.ai/internal/reload_all_mcp_servers"
             | "x.ai/internal/reload_project_mcp_servers" | "x.ai/internal/reload_skills"
-            | "x.ai/internal/reload_workflows" | "x.ai/internal/reload_models"
+            | "x.ai/internal/reload_workflows" | "x.ai/internal/reload_subagents"
+            | "x.ai/internal/reload_models"
             | "x.ai/internal/reload_models_cache" | "x.ai/internal/auth_cleared"
             | "x.ai/plugins/reload" | "x.ai/commands/list" => {
                 crate::extensions::session_admin::handle(self, &args).await

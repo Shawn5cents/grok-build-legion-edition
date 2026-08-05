@@ -8,6 +8,7 @@ INSTALL_BIN_DIR="${LEGION_BIN_DIR:-$HOME/.local/bin}"
 INSTALL_SHARE_DIR="${LEGION_SHARE_DIR:-$HOME/.local/share/legion}"
 INSTALL_TOOLS_DIR="$INSTALL_SHARE_DIR/tools"
 GROK_CONFIG_HOME="${GROK_HOME:-$HOME/.grok}"
+GROK_BIN_DIR="$GROK_CONFIG_HOME/bin"
 PRESETS_DIR="$GROK_CONFIG_HOME/config-presets"
 
 cd -- "$PROJECT_DIR"
@@ -24,8 +25,8 @@ if [ ! -x "$BINARY" ]; then
     exit 1
 fi
 
-mkdir -p -- "$INSTALL_BIN_DIR" "$INSTALL_TOOLS_DIR" "$PRESETS_DIR"
-chmod 700 "$GROK_CONFIG_HOME" "$PRESETS_DIR" 2>/dev/null || true
+mkdir -p -- "$INSTALL_BIN_DIR" "$INSTALL_TOOLS_DIR" "$GROK_BIN_DIR" "$PRESETS_DIR"
+chmod 700 "$GROK_CONFIG_HOME" "$GROK_BIN_DIR" "$PRESETS_DIR" 2>/dev/null || true
 
 echo "🚚 Installing runtime and control tools..."
 install -m 0755 "$BINARY" "$INSTALL_BIN_DIR/xai-grok-pager"
@@ -47,6 +48,12 @@ for preset in "$PROJECT_DIR"/presets/*.toml; do
 done
 
 ln -sfn "legion" "$INSTALL_BIN_DIR/grok"
+# The updater atomically replaces these managed entry points with binaries from
+# Legion GitHub releases. Seed all of them with the freshly built local binary
+# so no direct command can fall through to an old upstream Grok installation.
+for entrypoint in legion grok agent; do
+    ln -sfn "$INSTALL_BIN_DIR/xai-grok-pager" "$GROK_BIN_DIR/$entrypoint"
+done
 ln -sfn "$INSTALL_TOOLS_DIR" "$INSTALL_BIN_DIR/.legion-tools"
 ln -sfn "$INSTALL_TOOLS_DIR/legion-hub.py" "$INSTALL_BIN_DIR/legion-hub"
 ln -sfn "$INSTALL_TOOLS_DIR/legion-mode.py" "$INSTALL_BIN_DIR/legion-mode"

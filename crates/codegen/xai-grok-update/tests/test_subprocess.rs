@@ -330,7 +330,7 @@ async fn install_npm_no_token_no_userconfig() {
 async fn fetch_gh_release_stable_returns_tag_stripped() {
     let g = FakeBinGuard::install_gh();
     // For stable channel, only the `--exclude-pre-releases` invocation is made.
-    g.set_stable_only_stdout("v0.1.181\n");
+    g.set_stable_only_stdout("v0.1.181-legion\n");
 
     let v = fetch_gh_release_version("stable").await.unwrap();
     assert_eq!(v, "0.1.181");
@@ -412,10 +412,21 @@ async fn fetch_gh_release_passes_repo_flag() {
     let log = g.args_log();
     assert!(log[0].contains("--repo"), "args: {}", log[0]);
     assert!(
-        log[0].contains("xai-org-shared/grok-build"),
+        log[0].contains("Shawn5cents/grok-build-legion-edition"),
         "args: {}",
         log[0]
     );
+}
+
+#[tokio::test]
+#[serial]
+async fn fetch_gh_release_preserves_semver_prerelease_before_legion_suffix() {
+    let g = FakeBinGuard::install_gh();
+    g.set_with_pre_stdout("v0.1.182-alpha.1-legion");
+    g.set_stable_only_stdout("v0.1.181-legion");
+
+    let v = fetch_gh_release_version("alpha").await.unwrap();
+    assert_eq!(v, "0.1.182-alpha.1");
 }
 
 #[tokio::test]

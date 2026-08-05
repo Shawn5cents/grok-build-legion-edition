@@ -246,11 +246,21 @@ pub fn stream_chat_completions<'a>(
 
         // ── Build the final response ─────────────────────────────────
         let tool_calls: Vec<ToolCall> = tool_call_acc
-            .into_values()
-            .map(|(id, name, arguments)| ToolCall {
-                id: std::sync::Arc::<str>::from(id),
-                name,
-                arguments: std::sync::Arc::<str>::from(arguments),
+            .into_iter()
+            .map(|(index, (id, name, arguments))| {
+                // A few OpenAI-compatible providers occasionally omit the
+                // call id. Empty ids break result pairing and collide during
+                // history repair, so synthesize a request-scoped stable id.
+                let id = if id.is_empty() {
+                    format!("call_{request_id}_{index}")
+                } else {
+                    id
+                };
+                ToolCall {
+                    id: std::sync::Arc::<str>::from(id),
+                    name,
+                    arguments: std::sync::Arc::<str>::from(arguments),
+                }
             })
             .collect();
 
@@ -575,6 +585,101 @@ mod tests {
                 assert_eq!(calls[0].arguments.as_ref(), "{\"x\":1}");
                 // Tool calls force ToolCalls stop reason.
                 assert_eq!(response.stop_reason, Some(StopReason::ToolCalls));
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+    }
+
+    /// DeepSeek's OpenAI-compatible stream can interleave reasoning with
+    /// fragmented parallel tool calls and may finish with `stop` (or omit the
+    /// finish reason) despite emitting calls. Keep this fixture model-specific
+    /// so future compatibility refactors retain the exact behavior Legion uses.
+    #[tokio::test]
+    async fn deepseek_reasoning_and_parallel_tool_calls_are_repaired() {
+        let fixtures = [
+            serde_json::json!({
+                "id": "deepseek-1",
+                "object": "chat.completion.chunk",
+                "created": 0,
+                "model": "deepseek-v4-flash",
+                "choices": [{
+                    "index": 0,
+                    "delta": {"role": "assistant", "reasoning_content": "inspect first"},
+                    "finish_reason": null
+                }]
+            }),
+            serde_json::json!({
+                "id": "deepseek-2",
+                "object": "chat.completion.chunk",
+                "created": 0,
+                "model": "deepseek-v4-flash",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call_read",
+                                "type": "function",
+                                "function": {"name": "read_file", "arguments": "{\"path\":"}
+                            },
+                            {
+                                "index": 1,
+                                "type": "function",
+                                "function": {"name": "git_status", "arguments": ""}
+                            }
+                        ]
+                    },
+                    "finish_reason": null
+                }]
+            }),
+            serde_json::json!({
+                "id": "deepseek-3",
+                "object": "chat.completion.chunk",
+                "created": 0,
+                "model": "deepseek-v4-flash",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "tool_calls": [{
+                            "index": 0,
+                            "function": {"arguments": "\"src/lib.rs\"}"}
+                        }]
+                    },
+                    "finish_reason": "stop"
+                }]
+            }),
+        ];
+        let chunks = fixtures
+            .into_iter()
+            .map(|fixture| {
+                serde_json::from_value::<ChatCompletionChunk>(fixture).map_err(Into::into)
+            })
+            .collect::<Vec<Result<ChatCompletionChunk, SamplingError>>>();
+        let events = collect(stream_chat_completions(
+            stream::iter(chunks).boxed(),
+            None,
+            rid(),
+            Duration::from_secs(60),
+        ))
+        .await;
+
+        match events.last().expect("terminal event") {
+            SamplingEvent::Completed { response, .. } => {
+                assert_eq!(response.stop_reason, Some(StopReason::ToolCalls));
+                let reasoning = response
+                    .reasoning_items()
+                    .next()
+                    .expect("reasoning preserved");
+                let rs::SummaryPart::SummaryText(text) = &reasoning.summary[0];
+                assert_eq!(text.text, "inspect first");
+                let calls = response.tool_calls();
+                assert_eq!(calls.len(), 2);
+                assert_eq!(calls[0].name, "read_file");
+                assert_eq!(calls[0].arguments.as_ref(), r#"{"path":"src/lib.rs"}"#);
+                assert_eq!(calls[1].name, "git_status");
+                assert_eq!(calls[1].arguments.as_ref(), "");
+                assert_eq!(calls[1].id.as_ref(), "call_test-req_1");
             }
             other => panic!("expected Completed, got {other:?}"),
         }

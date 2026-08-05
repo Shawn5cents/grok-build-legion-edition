@@ -11,6 +11,16 @@ use xai_grok_tools::implementations::grok_build::task::coordinator::{
     ChildCompletion, CompletionDisposition,
 };
 #[test]
+fn fallback_classifier_accepts_only_typed_rate_limit_errors() {
+    let rate_limited = acp::Error::new(
+        crate::sampling::error::RATE_LIMITED_ERROR_CODE,
+        "Rate limited",
+    );
+    let server_error = acp::Error::new(-32000, "server error");
+    assert!(is_rate_limited_prompt_error(&rate_limited));
+    assert!(!is_rate_limited_prompt_error(&server_error));
+}
+#[test]
 fn canonical_total_tokens_does_not_double_count_reasoning() {
     let totals = xai_chat_state::UsageTotals {
         input_tokens: 100,

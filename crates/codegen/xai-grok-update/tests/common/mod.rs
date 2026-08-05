@@ -56,6 +56,10 @@ pub fn test_home() -> &'static PathBuf {
             std::env::remove_var("GROK_INSTALLER");
             std::env::remove_var("GROK_MANAGED_BY_NPM");
             std::env::remove_var("GROK_MANAGED_BY_INTERNAL");
+            // Release builds never honor legacy updater routes. Integration
+            // tests opt in so inherited npm/GCS backend coverage remains
+            // useful without exposing those routes to Legion users.
+            std::env::set_var("GROK_TEST_LEGACY_UPDATER", "1");
         }
         path
     })

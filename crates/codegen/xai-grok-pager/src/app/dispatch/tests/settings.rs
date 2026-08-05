@@ -1106,6 +1106,38 @@ fn set_default_model_idempotent_when_already_current() {
         "re-dispatching same model must be idempotent (no effects), got {effects:?}",
     );
 }
+
+#[test]
+fn legion_rejects_settings_default_model_that_differs_from_orchestrator() {
+    let mut app = test_app_with_agent();
+    let orchestrator = acp::ModelId::new("orchestrator-model");
+    let other = acp::ModelId::new("other-model");
+    let agent_id = AgentId(0);
+    {
+        let agent = app.agents.get_mut(&agent_id).unwrap();
+        agent.session.models.available.insert(
+            orchestrator.clone(),
+            acp::ModelInfo::new(orchestrator.clone(), "Orchestrator".to_string()),
+        );
+        agent.session.models.available.insert(
+            other.clone(),
+            acp::ModelInfo::new(other.clone(), "Other".to_string()),
+        );
+        agent.session.models.set_current(orchestrator.clone(), None);
+        agent
+            .legion_assignments
+            .insert("orchestrator".to_string(), orchestrator.0.to_string());
+    }
+    app.current_ui.permission_mode = Some("legion".to_string());
+
+    let effects = dispatch(Action::SetDefaultModel(other), &mut app);
+
+    assert!(effects.is_empty());
+    assert_eq!(
+        app.agents[&agent_id].session.models.current.as_ref(),
+        Some(&orchestrator)
+    );
+}
 /// `clamp_max_thoughts_width` clamps
 /// out-of-range values to the registered `[40, 500]` bounds.
 #[test]

@@ -3876,6 +3876,8 @@ fn subagent_spawn_context_reloads_project_definitions_after_trust_changes() {
             );
             cfg.subagent_model_overrides
                 .insert("probe".into(), "refreshed-model".into());
+            cfg.subagent_model_fallbacks
+                .insert("probe".into(), "fallback-model".into());
             cfg.subagent_toggle.insert("probe".into(), false);
         }
         crate::agent::folder_trust::record_for_test(repo.path(), false);
@@ -3895,6 +3897,13 @@ fn subagent_spawn_context_reloads_project_definitions_after_trust_changes() {
                 .get("probe")
                 .map(String::as_str),
             Some("refreshed-model")
+        );
+        assert_eq!(
+            untrusted
+                .subagent_model_fallbacks
+                .get("probe")
+                .map(String::as_str),
+            Some("fallback-model")
         );
         assert_eq!(untrusted.subagent_toggle.get("probe"), Some(&false));
         crate::agent::folder_trust::record_for_test(repo.path(), true);

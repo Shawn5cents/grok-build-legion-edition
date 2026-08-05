@@ -28,20 +28,15 @@ const MSG_AUTO_UPDATE_BACKGROUND: &str = "Auto-update running in background.";
 const MSG_RUN_UPDATE_MANUAL: &str = "Run `grok update` to get the latest version.";
 /// Manual-install one-liner for this platform's bootstrap installer.
 fn manual_install_cmd() -> &'static str {
-    if cfg!(windows) {
-        "irm https://x.ai/cli/install.ps1 | iex"
-    } else {
-        "curl -fsSL https://x.ai/cli/install.sh | bash"
-    }
+    "git clone https://github.com/Shawn5cents/grok-build-legion-edition.git && cd grok-build-legion-edition && ./install.sh"
 }
 
 /// Build a reinstall hint for a known installer type.
-fn reinstall_hint(installer: &str) -> String {
-    match installer {
-        "npm" => "Please reinstall via npm:\n  npm i -g @xai-official/grok".to_string(),
-        "gh-release" => "Please reinstall via GitHub Releases:\n  gh release download --repo xai-org-shared/grok-build --pattern 'grok-*' --output grok && chmod +x grok".to_string(),
-        _ => format!("Please reinstall via:\n  {}", manual_install_cmd()),
-    }
+fn reinstall_hint(_installer: &str) -> String {
+    format!(
+        "Please reinstall Legion from GitHub:\n  {}",
+        manual_install_cmd()
+    )
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -338,23 +333,43 @@ fn disk_version_for_installer(installer: &str) -> Option<String> {
     }
 }
 
+fn legacy_installer_tests_enabled() -> bool {
+    cfg!(debug_assertions)
+        && std::env::var_os("GROK_TEST_LEGACY_UPDATER").is_some_and(|value| value == "1")
+}
+
 fn env_installer() -> Option<&'static str> {
     if let Ok(v) = std::env::var("GROK_INSTALLER") {
         return match v.to_ascii_lowercase().as_str() {
-            "npm" => Some("npm"),
-            "internal" => Some("internal"),
+            // These are legacy upstream install markers. A Legion binary
+            // must never use them to fetch an xAI package or CDN artifact.
+            "npm" if legacy_installer_tests_enabled() => Some("npm"),
+            "internal" if legacy_installer_tests_enabled() => Some("internal"),
+            "npm" | "internal" => Some("gh-release"),
             "gh-release" | "gh" => Some("gh-release"),
             _ => None,
         };
     }
     if std::env::var_os("GROK_MANAGED_BY_NPM").is_some() {
-        return Some("npm");
+        return Some(if legacy_installer_tests_enabled() {
+            "npm"
+        } else {
+            "gh-release"
+        });
     }
     if std::env::var_os("GROK_MANAGED_BY_INTERNAL").is_some() {
-        return Some("internal");
+        return Some(if legacy_installer_tests_enabled() {
+            "internal"
+        } else {
+            "gh-release"
+        });
     }
     if std::env::var_os("npm_config_user_agent").is_some() {
-        return Some("npm");
+        return Some(if legacy_installer_tests_enabled() {
+            "npm"
+        } else {
+            "gh-release"
+        });
     }
     None
 }
@@ -364,11 +379,22 @@ pub async fn get_installer() -> Option<&'static str> {
         return Some(i);
     }
     let cfg = config::load_config().await;
-    match cfg.cli.installer.as_deref() {
-        Some("npm") => Some("npm"),
-        Some("gh-release") => Some("gh-release"),
-        _ => Some("internal"),
+    if legacy_installer_tests_enabled() {
+        return match cfg.cli.installer.as_deref() {
+            Some("npm") => Some("npm"),
+            Some("gh-release") => Some("gh-release"),
+            _ => Some("internal"),
+        };
     }
+    // Migrate existing Legion installs in memory. Older builds persisted
+    // `internal` after downloading from xAI, and npm markers would route to
+    // @xai-official/grok. All Legion builds now update from our repository.
+    if let Some(legacy) = cfg.cli.installer.as_deref()
+        && legacy != "gh-release"
+    {
+        tracing::debug!(legacy_installer = legacy, "using Legion GitHub updater");
+    }
+    Some("gh-release")
 }
 
 fn needs_update(current: &str, target: &str, channel: &str, allow_downgrade: bool) -> Option<bool> {
@@ -1395,13 +1421,12 @@ fn relative_symlink_target(target: &std::path::Path, link: &std::path::Path) -> 
     target.to_path_buf()
 }
 
-/// Swap `~/.grok/bin/{grok,agent}` to point at `binary_path`. Returns the
+/// Swap `~/.grok/bin/{grok,agent,legion}` to point at `binary_path`. Returns the
 /// `grok` link path (for [`regenerate_completions`]).
 ///
-/// `grok` and `agent` are first-class entry points that the bootstrap
-/// installers (`install.sh`, `install.ps1`, `install-enterprise.sh`)
-/// maintain in lockstep, and so must the updater — otherwise `grok update`
-/// leaves `agent` pinned at the previous version.
+/// `legion` is the fork launcher's managed entry point; updating it keeps
+/// future shell launches on the downloaded Legion release. `grok` and `agent`
+/// remain compatibility entry points and move in lockstep.
 ///
 /// Unix: atomic symlink swap with relative target (survives Docker
 /// bind-mounts of `~/.grok/`). Windows: [`windows_replace_exe`].
@@ -1419,9 +1444,15 @@ async fn swap_managed_bin_links(
 ) -> Result<std::path::PathBuf> {
     let grok_name = if cfg!(windows) { "grok.exe" } else { "grok" };
     let agent_name = if cfg!(windows) { "agent.exe" } else { "agent" };
+    let legion_name = if cfg!(windows) {
+        "legion.exe"
+    } else {
+        "legion"
+    };
     let grok_link = bin_dir.join(grok_name);
     let agent_link = bin_dir.join(agent_name);
-    let link_paths: [std::path::PathBuf; 2] = [grok_link.clone(), agent_link];
+    let legion_link = bin_dir.join(legion_name);
+    let link_paths: [std::path::PathBuf; 3] = [grok_link.clone(), agent_link, legion_link];
 
     // Capture every link up-front so a 2nd-link capture failure can't
     // strand the 1st mid-swap.
@@ -2029,7 +2060,7 @@ async fn agent_exe_differs(
     }
 }
 
-/// Download a single asset from a GitHub release via `gh release download`.
+/// Download a single asset from a GitHub release, with a direct HTTP fallback.
 async fn gh_release_download(tag: &str, pattern: &str, dest: &std::path::Path) -> Result<()> {
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -2057,7 +2088,15 @@ async fn gh_release_download(tag: &str, pattern: &str, dest: &std::path::Path) -
     .stderr(Stdio::piped());
     xai_grok_tools::util::detach_command(&mut cmd);
     cmd.envs(xai_grok_tools::util::pager_env());
-    let output = cmd.output().await?;
+    let output = match cmd.output().await {
+        Ok(output) => output,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            pb.finish_and_clear();
+            let url = github_release_asset_url(tag, pattern);
+            return download_with_progress(&url, dest).await;
+        }
+        Err(error) => return Err(error.into()),
+    };
 
     pb.finish_and_clear();
 
@@ -2074,11 +2113,17 @@ async fn gh_release_download(tag: &str, pattern: &str, dest: &std::path::Path) -
     Ok(())
 }
 
-/// Download and install grok from GitHub Releases (xai-org-shared/grok-build).
+fn github_release_asset_url(tag: &str, asset: &str) -> String {
+    format!(
+        "https://github.com/{}/releases/download/{tag}/{asset}",
+        crate::version::GH_RELEASE_REPO
+    )
+}
+
+/// Download and install Legion from its GitHub Releases repository.
 ///
-/// Uses `gh release download` to fetch the binary matching the current platform.
-/// This works anywhere the `gh` CLI is authenticated, without needing npm or
-/// internal network access.
+/// Uses `gh release download` when available, otherwise downloads the public
+/// release asset directly from GitHub without requiring the GitHub CLI.
 async fn install_gh_release(target: Option<&str>) -> Result<()> {
     let (os, arch) = detect_platform()?;
     let platform = format!("{}-{}", os, arch);
@@ -2094,16 +2139,20 @@ async fn install_gh_release(target: Option<&str>) -> Result<()> {
     tokio::fs::create_dir_all(&download_dir).await?;
     tokio::fs::create_dir_all(&bin_dir).await?;
 
+    // Keep the local managed filename compatible with the inherited
+    // version/symlink machinery. The published asset itself follows Legion's
+    // release convention (for example `legion-linux-x86_64`).
     let binary_name = format!("grok-{}-{}", version, platform);
     let binary_path = download_dir.join(&binary_name);
-    let tag = format!("v{}", version);
+    let tag = legion_release_tag(&version);
+    let asset_name = legion_release_asset(&platform);
 
     eprintln!(
         "  Downloading grok v{} ({}) from GitHub Releases...",
         version, platform
     );
 
-    gh_release_download(&tag, &binary_name, &binary_path).await?;
+    gh_release_download(&tag, &asset_name, &binary_path).await?;
 
     // chmod +x
     #[cfg(unix)]
@@ -2112,7 +2161,7 @@ async fn install_gh_release(target: Option<&str>) -> Result<()> {
         tokio::fs::set_permissions(&binary_path, std::fs::Permissions::from_mode(0o755)).await?;
     }
 
-    // Atomic swap of ~/.grok/bin/{grok,agent} -> downloaded binary.
+    // Atomic swap of ~/.grok/bin/{grok,agent,legion} -> downloaded binary.
     swap_managed_bin_links(&binary_path, &bin_dir).await?;
 
     // Update grok-latest -> versioned binary so any existing symlinks that route
@@ -2157,6 +2206,18 @@ async fn install_gh_release(target: Option<&str>) -> Result<()> {
     .await;
 
     Ok(())
+}
+
+fn legion_release_tag(version: &str) -> String {
+    format!("v{}{}", version, crate::version::GH_RELEASE_TAG_SUFFIX)
+}
+
+fn legion_release_asset(platform: &str) -> String {
+    if cfg!(windows) {
+        format!("legion-{platform}.exe")
+    } else {
+        format!("legion-{platform}")
+    }
 }
 
 /// Creates a temporary .npmrc file with the NPM token if present.
@@ -3533,44 +3594,39 @@ mod tests {
     // ──────────────────────────────────────────────────────────────────────
 
     #[test]
-    fn test_reinstall_hint_npm_mentions_npm_command() {
+    fn test_reinstall_hint_npm_redirects_to_legion_repo() {
         let hint = reinstall_hint("npm");
-        assert!(hint.contains("npm i -g"), "should suggest npm i -g: {hint}");
         assert!(
-            hint.contains("@xai-official/grok"),
-            "should name the package: {hint}"
+            hint.contains("Shawn5cents/grok-build-legion-edition"),
+            "should name the Legion repository: {hint}"
+        );
+        assert!(
+            !hint.contains("xai-official"),
+            "must not name upstream: {hint}"
         );
     }
 
     #[test]
-    fn test_reinstall_hint_gh_release_mentions_gh_command() {
+    fn test_reinstall_hint_gh_release_mentions_legion_repo() {
         let hint = reinstall_hint("gh-release");
         assert!(
-            hint.contains("gh release download"),
-            "should suggest gh release download: {hint}"
+            hint.contains("git clone"),
+            "should suggest cloning the repository: {hint}"
         );
         assert!(
-            hint.contains("xai-org-shared/grok-build"),
+            hint.contains("Shawn5cents/grok-build-legion-edition"),
             "should name the repo: {hint}"
         );
     }
 
     #[test]
-    fn test_reinstall_hint_internal_mentions_platform_installer() {
+    fn test_reinstall_hint_internal_mentions_legion_installer() {
         let hint = reinstall_hint("internal");
-        if cfg!(windows) {
-            assert!(hint.contains("irm"), "should suggest irm install: {hint}");
-            assert!(
-                hint.contains("install.ps1"),
-                "should reference install.ps1: {hint}"
-            );
-        } else {
-            assert!(hint.contains("curl"), "should suggest curl install: {hint}");
-            assert!(
-                hint.contains("install.sh"),
-                "should reference install.sh: {hint}"
-            );
-        }
+        assert!(
+            hint.contains("install.sh"),
+            "should reference install.sh: {hint}"
+        );
+        assert!(!hint.contains("x.ai/cli"), "must not name upstream: {hint}");
     }
 
     #[test]
@@ -4059,6 +4115,21 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_legion_github_release_coordinates_match_published_assets() {
+        assert_eq!(legion_release_tag("0.2.111"), "v0.2.111-legion");
+        let asset = legion_release_asset("linux-x86_64");
+        if cfg!(windows) {
+            assert_eq!(asset, "legion-linux-x86_64.exe");
+        } else {
+            assert_eq!(asset, "legion-linux-x86_64");
+        }
+        assert_eq!(
+            github_release_asset_url("v0.2.111-legion", "legion-linux-x86_64"),
+            "https://github.com/Shawn5cents/grok-build-legion-edition/releases/download/v0.2.111-legion/legion-linux-x86_64"
+        );
+    }
+
     // ──────────────────────────────────────────────────────────────────────
     // cleanup_old_downloads — additional edge cases
     // ──────────────────────────────────────────────────────────────────────
@@ -4297,11 +4368,12 @@ mod tests {
     // ──────────────────────────────────────────────────────────────────────
     // env_installer — env-var based, must run serially.
     //
-    // Resolution order (matches function body):
-    //   1. GROK_INSTALLER (npm | internal | gh-release | gh)
-    //   2. GROK_MANAGED_BY_NPM       → npm
-    //   3. GROK_MANAGED_BY_INTERNAL  → internal
-    //   4. npm_config_user_agent      → npm
+    // Resolution order (matches function body). All recognized legacy
+    // markers resolve to the Legion GitHub release backend:
+    //   1. GROK_INSTALLER (npm | internal | gh-release | gh) → gh-release
+    //   2. GROK_MANAGED_BY_NPM                              → gh-release
+    //   3. GROK_MANAGED_BY_INTERNAL                         → gh-release
+    //   4. npm_config_user_agent                             → gh-release
     //   5. None
     // ──────────────────────────────────────────────────────────────────────
 
@@ -4357,7 +4429,7 @@ mod tests {
     fn test_env_installer_explicit_npm() {
         let _g = InstallerEnvGuard::isolate();
         unsafe { std::env::set_var("GROK_INSTALLER", "npm") };
-        assert_eq!(env_installer(), Some("npm"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     #[test]
@@ -4365,7 +4437,7 @@ mod tests {
     fn test_env_installer_explicit_internal() {
         let _g = InstallerEnvGuard::isolate();
         unsafe { std::env::set_var("GROK_INSTALLER", "internal") };
-        assert_eq!(env_installer(), Some("internal"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     #[test]
@@ -4390,7 +4462,7 @@ mod tests {
     fn test_env_installer_explicit_uppercase_normalized() {
         let _g = InstallerEnvGuard::isolate();
         unsafe { std::env::set_var("GROK_INSTALLER", "NPM") };
-        assert_eq!(env_installer(), Some("npm"));
+        assert_eq!(env_installer(), Some("gh-release"));
 
         unsafe { std::env::set_var("GROK_INSTALLER", "Gh-Release") };
         assert_eq!(env_installer(), Some("gh-release"));
@@ -4427,7 +4499,7 @@ mod tests {
     fn test_env_installer_managed_by_npm() {
         let _g = InstallerEnvGuard::isolate();
         unsafe { std::env::set_var("GROK_MANAGED_BY_NPM", "1") };
-        assert_eq!(env_installer(), Some("npm"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     #[test]
@@ -4436,7 +4508,7 @@ mod tests {
         // The check is `is_some` — any value (including empty) wins.
         let _g = InstallerEnvGuard::isolate();
         unsafe { std::env::set_var("GROK_MANAGED_BY_NPM", "") };
-        assert_eq!(env_installer(), Some("npm"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     #[test]
@@ -4444,7 +4516,7 @@ mod tests {
     fn test_env_installer_managed_by_internal() {
         let _g = InstallerEnvGuard::isolate();
         unsafe { std::env::set_var("GROK_MANAGED_BY_INTERNAL", "1") };
-        assert_eq!(env_installer(), Some("internal"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     #[test]
@@ -4459,33 +4531,31 @@ mod tests {
                 "npm/10.2.0 node/v20.11.0 darwin arm64 workspaces/false",
             )
         };
-        assert_eq!(env_installer(), Some("npm"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     #[test]
     #[serial_test::serial]
     fn test_env_installer_managed_by_npm_wins_over_npm_config_user_agent() {
-        // Both set: the order in env_installer is MANAGED_BY_NPM checked first,
-        // so MANAGED_BY_NPM wins. (Result is the same — both → npm — but the
-        // resolution path matters for future maintainers.)
+        // Both set: the order in env_installer is MANAGED_BY_NPM checked first.
         let _g = InstallerEnvGuard::isolate();
         unsafe {
             std::env::set_var("GROK_MANAGED_BY_NPM", "1");
             std::env::set_var("npm_config_user_agent", "npm/10");
         }
-        assert_eq!(env_installer(), Some("npm"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     #[test]
     #[serial_test::serial]
     fn test_env_installer_explicit_internal_wins_over_npm_managed() {
-        // GROK_INSTALLER=internal must override an inherited MANAGED_BY_NPM.
+        // Both legacy markers must resolve to the Legion GitHub updater.
         let _g = InstallerEnvGuard::isolate();
         unsafe {
             std::env::set_var("GROK_INSTALLER", "internal");
             std::env::set_var("GROK_MANAGED_BY_NPM", "1");
         }
-        assert_eq!(env_installer(), Some("internal"));
+        assert_eq!(env_installer(), Some("gh-release"));
     }
 
     // ──────────────────────────────────────────────────────────────────────

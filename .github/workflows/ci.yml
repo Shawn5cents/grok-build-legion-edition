@@ -1,10 +1,18 @@
-name: Legion Edition 2.0 CI/CD
+name: Legion CI
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legion-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,15 +21,24 @@ jobs:
   rust-check:
     name: 🦀 Rust Code Quality & Build
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
+
+      - name: Install DotSlash
+        run: cargo install dotslash --version 0.5.7 --locked
+
+      - name: Install ripgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ripgrep
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -38,13 +55,14 @@ jobs:
   python-tools-check:
     name: 🐍 Python Auto-Discovery Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -62,13 +80,17 @@ jobs:
   release-binary-build:
     name: 📦 Release Binary Build Verification
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install DotSlash
+        run: cargo install dotslash --version 0.5.7 --locked
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2

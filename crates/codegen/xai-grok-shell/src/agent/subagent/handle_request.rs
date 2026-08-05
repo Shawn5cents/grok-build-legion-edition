@@ -85,6 +85,37 @@ pub(crate) async fn run_shell_child(
         let msg = format!("Unknown subagent type: {}", request.subagent_type);
         return child_run_output(failure_result(&request, &msg), completion_data, None);
     };
+    if definition.scope == xai_grok_agent::config::AgentScope::BuiltIn
+        && request.subagent_type == "verifier"
+        && request.runtime_overrides.output_schema.is_none()
+    {
+        request.runtime_overrides.output_schema = Some(serde_json::json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "summary", "checks", "failures"],
+            "properties": {
+                "status": { "type": "string", "enum": ["PASS", "FAIL"] },
+                "summary": { "type": "string" },
+                "checks": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["command", "outcome"],
+                        "properties": {
+                            "command": { "type": "string" },
+                            "outcome": { "type": "string" }
+                        }
+                    }
+                },
+                "failures": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            }
+        }));
+    }
     match gate_subagent_type(&request.subagent_type, &ctx) {
         SubagentValidateTypeOutcome::Disabled => {
             let msg = format!(
@@ -546,7 +577,7 @@ pub(crate) async fn run_shell_child(
         InitialContextSource::Forked => "forked",
         InitialContextSource::Resumed => "resumed",
     };
-    let subagent_meta = SubagentMeta {
+    let mut subagent_meta = SubagentMeta {
         subagent_id: subagent_id.clone(),
         parent_session_id: ctx.parent_session_id.clone(),
         child_session_id: child_session_id.0.to_string(),
@@ -593,7 +624,7 @@ pub(crate) async fn run_shell_child(
             upload_subagent_metadata(&gcs_meta, &bucket, method, auth_for_spawn).await;
         });
     }
-    let gcs_upload_ctx = GcsUploadContext {
+    let mut gcs_upload_ctx = GcsUploadContext {
         bucket_url: ctx.gcs_bucket_url.clone(),
         upload_method: ctx.gcs_upload_method.clone(),
         model_id: Some(effective_model_id.0.to_string()),
@@ -1074,7 +1105,7 @@ pub(crate) async fn run_shell_child(
         ctx.managed_mcp_state.clone(),
         None,
         ctx.managed_mcp_proxy_base_url.clone(),
-        effective_model_id,
+        effective_model_id.clone(),
         ctx.yolo_mode
             || matches!(
                 agent_permission_mode,
@@ -1203,8 +1234,8 @@ pub(crate) async fn run_shell_child(
     }
     let (prompt_tx, prompt_rx) = oneshot::channel();
     let prompt_text = task_prompt_text;
-    let child_prompt_id = uuid::Uuid::now_v7().to_string();
-    let turn_started_at = chrono::Utc::now().to_rfc3339();
+    let mut child_prompt_id = uuid::Uuid::now_v7().to_string();
+    let mut turn_started_at = chrono::Utc::now().to_rfc3339();
     let _ = child_handle.cmd_tx.send(SessionCommand::Prompt {
         prompt_id: child_prompt_id.clone(),
         prompt_blocks: vec![acp::ContentBlock::Text(acp::TextContent::new(prompt_text))],
@@ -1237,7 +1268,104 @@ pub(crate) async fn run_shell_child(
         persist_ack: None,
         parsed_prompt_tx: None,
     });
-    let wait_outcome = await_subagent_turn_or_cancellation(prompt_rx, cancel_token.clone()).await;
+    let mut wait_outcome =
+        await_subagent_turn_or_cancellation(prompt_rx, cancel_token.clone()).await;
+    if is_rate_limited_wait_outcome(&wait_outcome)
+        && let Some(fallback_model) = ctx
+            .subagent_model_fallbacks
+            .get(&request.subagent_type)
+            .map(String::as_str)
+    {
+        match resolve_model_override_to_config(fallback_model, &ctx) {
+            Some((fallback_sampling_config, fallback_model_id))
+                if fallback_model_id != effective_model_id =>
+            {
+                tracing::warn!(
+                    subagent_id = %request.id,
+                    subagent_type = %request.subagent_type,
+                    primary_model = %effective_model_id.0,
+                    fallback_model = %fallback_model_id.0,
+                    "Primary subagent model exhausted its rate-limit retries; switching once to configured fallback"
+                );
+                let fallback_threshold =
+                    ctx.resolve_auto_compact_threshold_percent(fallback_model_id.0.as_ref());
+                let (switch_tx, switch_rx) = oneshot::channel();
+                let switch_sent = child_handle
+                    .cmd_tx
+                    .send(SessionCommand::SetSessionModel {
+                        sampling_config: fallback_sampling_config,
+                        use_concise: false,
+                        apply_prompt_override: false,
+                        skip_prompt_rewrite: true,
+                        auto_compact_threshold_percent: fallback_threshold,
+                        responds_to: switch_tx,
+                    })
+                    .is_ok();
+                let switched = if switch_sent {
+                    matches!(switch_rx.await, Ok(Ok(_)))
+                } else {
+                    false
+                };
+                if switched {
+                    subagent_meta.effective_model_id = Some(fallback_model_id.0.to_string());
+                    write_subagent_meta(&subagent_meta_dir, &subagent_meta);
+                    gcs_upload_ctx.model_id = Some(fallback_model_id.0.to_string());
+                    child_prompt_id = uuid::Uuid::now_v7().to_string();
+                    turn_started_at = chrono::Utc::now().to_rfc3339();
+                    let (fallback_prompt_tx, fallback_prompt_rx) = oneshot::channel();
+                    let retry_prompt = format!(
+                        "The primary model was rate limited before completing this turn. \
+                         Continue the original task now using the existing conversation context. \
+                         Do not restart completed work.\n\nOriginal task:\n{prompt}",
+                    );
+                    let _ = child_handle.cmd_tx.send(SessionCommand::Prompt {
+                        prompt_id: child_prompt_id.clone(),
+                        prompt_blocks: vec![acp::ContentBlock::Text(acp::TextContent::new(
+                            retry_prompt,
+                        ))],
+                        prompt_mode: crate::session::plan_mode::PromptMode::Agent,
+                        artifact_upload_ctx: None,
+                        client_identifier: None,
+                        screen_mode: None,
+                        verbatim: true,
+                        traceparent: xai_file_utils::trace_context::current_traceparent(),
+                        json_schema: request.runtime_overrides.output_schema.clone(),
+                        send_now: false,
+                        admission: None,
+                        tool_overrides_update: None,
+                        respond_to: fallback_prompt_tx,
+                        persist_ack: None,
+                        parsed_prompt_tx: None,
+                    });
+                    wait_outcome = await_subagent_turn_or_cancellation(
+                        fallback_prompt_rx,
+                        cancel_token.clone(),
+                    )
+                    .await;
+                } else {
+                    tracing::warn!(
+                        subagent_id = %request.id,
+                        fallback_model = %fallback_model_id.0,
+                        "Failed to switch subagent session to configured fallback"
+                    );
+                }
+            }
+            Some((_fallback_sampling_config, fallback_model_id)) => {
+                tracing::warn!(
+                    subagent_id = %request.id,
+                    fallback_model = %fallback_model_id.0,
+                    "Ignoring subagent fallback because it resolves to the rate-limited primary model"
+                );
+            }
+            None => {
+                tracing::warn!(
+                    subagent_id = %request.id,
+                    fallback_model,
+                    "Subagent fallback references an unknown model"
+                );
+            }
+        }
+    }
     let duration_ms = start.elapsed().as_millis() as u64;
     let mut turn_token_totals: Option<(u64, u64, u64)> = None;
     let mut cancellation_may_hide_usage = false;

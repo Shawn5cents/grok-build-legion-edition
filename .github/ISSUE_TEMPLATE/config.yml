@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/Shawn5cents/grok-build-legion-edition/security/advisories/new
+    about: Report vulnerabilities privately instead of opening an issue.
+  - name: Support guidance
+    url: https://github.com/Shawn5cents/grok-build-legion-edition/blob/main/SUPPORT.md
+    about: Read what information to include and where provider-specific problems belong.
