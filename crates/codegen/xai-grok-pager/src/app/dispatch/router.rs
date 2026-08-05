@@ -28,6 +28,7 @@ use super::import_claude::{
 };
 use super::interject::dispatch_interject;
 use super::jump::{dispatch_jump_dismiss, dispatch_jump_picker_select, dispatch_jump_show_picker};
+use super::legion;
 use super::modes::{
     dispatch_cycle_mode, dispatch_enter_plan_mode, dispatch_show_plan, dispatch_toggle_yolo,
     set_permission_mode, set_plan_mode, set_yolo_mode,
@@ -867,6 +868,12 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             let ActiveView::Agent(id) = app.active_view else {
                 return vec![];
             };
+            if !legion::base_model_change_allowed(app, id, &model_id) {
+                app.show_toast(
+                    "Legion keeps the base model equal to Orchestrator; change it in Agents → Legion",
+                );
+                return vec![];
+            }
             let Some(agent) = app.agents.get_mut(&id) else {
                 return vec![];
             };
@@ -882,6 +889,12 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 effort,
                 prev_model_id: None,
             }]
+        }
+        Action::LegionRoleModelAssigned { role, model_id } => {
+            let ActiveView::Agent(id) = app.active_view else {
+                return vec![];
+            };
+            legion::role_model_assigned(app, id, role, model_id)
         }
         Action::AnnouncementsHide => {
             let shown_key = crate::views::announcements::first_session_announcement(

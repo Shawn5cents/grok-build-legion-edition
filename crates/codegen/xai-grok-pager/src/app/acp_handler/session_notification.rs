@@ -127,6 +127,7 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
         _ => {}
     }
     let is_api_key_auth = app.is_api_key_auth;
+    let legion_active = crate::app::dispatch::legion::is_active(app);
     let matched = match find_session_match(app, &session_notif.session_id) {
         Some(m) => m,
         None => {
@@ -185,6 +186,7 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
     }
     let mut plugins_changed_needs_skills_refetch = false;
     let mut terminal_outcome: Option<super::super::turn_completion::TerminalApply> = None;
+    let mut legion_model_correction: Option<(acp::SessionId, acp::ModelId, acp::ModelId)> = None;
     let root_session_id: &str = session_notif.session_id.0.as_ref();
     let changed = match session_notif.update {
         ref update @ (XaiSessionUpdate::AutoCompactStarted { .. }
@@ -327,11 +329,18 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
                 &agent.session.cwd,
                 agent.subagent_sessions.get(&child_session_id),
             );
+            let mut child_models = agent.session.models.clone();
+            if let Some(model_id) = model_display.as_deref() {
+                // The spawn notification is authoritative for the child's
+                // effective model. Keeping the parent's catalog is useful for
+                // names/context metadata, but its current selection is not.
+                child_models.set_current(acp::ModelId::new(model_id.to_string()), None);
+            }
             let child_session = AgentSession {
                 id: AgentId(0),
                 acp_tx: agent.session.acp_tx.clone(),
                 session_id: Some(acp::SessionId::new(child_session_id.clone())),
-                models: agent.session.models.clone(),
+                models: child_models,
                 state: AgentState::TurnRunning,
                 tracker: AcpUpdateTracker::new(),
                 cwd: effective_child_cwd,
@@ -863,6 +872,16 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
             let resolved_effort = agent.session.models.reasoning_effort;
             let actually_changed =
                 prev_model.as_ref() != Some(&new_model_id) || prev_effort != resolved_effort;
+            if legion_active
+                && let Some(orchestrator) = crate::app::dispatch::legion::orchestrator_model(agent)
+                && orchestrator != new_model_id
+            {
+                let remote_model = new_model_id.clone();
+                agent.session.models.set_current(orchestrator.clone(), None);
+                agent.session.model_switch_pending = true;
+                legion_model_correction =
+                    Some((session_notif.session_id.clone(), orchestrator, remote_model));
+            }
             if actually_changed {
                 tracing::info!(
                     session_id = session_notif.session_id.0.as_ref(),
@@ -1032,6 +1051,15 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
         return super::super::turn_completion::apply_terminal_outcome(
             outcome, app, parent_id, is_active,
         );
+    }
+    if let Some((session_id, model_id, prev_model_id)) = legion_model_correction {
+        app.pending_effects.push(Effect::SwitchModel {
+            agent_id: parent_id,
+            session_id,
+            model_id,
+            effort: None,
+            prev_model_id: Some(prev_model_id),
+        });
     }
     changed && is_active
 }

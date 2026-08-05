@@ -2611,3 +2611,124 @@ fn toggle_scroll_log_flips_recorder_and_reports_path() {
         "disable must be confirmed, got {texts:?}"
     );
 }
+
+fn seed_legion_models(app: &mut AppView) -> (acp::ModelId, acp::ModelId) {
+    let base = acp::ModelId::new("base-model");
+    let other = acp::ModelId::new("other-model");
+    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+    agent.session.models.available.insert(
+        base.clone(),
+        acp::ModelInfo::new(base.clone(), "Base Model".to_string()),
+    );
+    agent.session.models.available.insert(
+        other.clone(),
+        acp::ModelInfo::new(other.clone(), "Other Model".to_string()),
+    );
+    agent.session.models.set_current(base.clone(), None);
+    agent
+        .legion_assignments
+        .insert("orchestrator".to_string(), base.0.to_string());
+    app.current_ui.permission_mode = Some("legion".to_string());
+    (base, other)
+}
+
+#[test]
+fn legion_blocks_generic_base_model_change() {
+    let mut app = test_app_with_agent();
+    let (base, other) = seed_legion_models(&mut app);
+
+    let effects = dispatch(
+        Action::SwitchModel {
+            model_id: other,
+            effort: None,
+        },
+        &mut app,
+    );
+
+    assert!(effects.is_empty());
+    let agent = app.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(agent.session.models.current.as_ref(), Some(&base));
+    assert!(!agent.session.model_switch_pending);
+}
+
+#[test]
+fn legion_orchestrator_assignment_switches_base_model() {
+    let mut app = test_app_with_agent();
+    let (_base, other) = seed_legion_models(&mut app);
+
+    let effects = dispatch(
+        Action::LegionRoleModelAssigned {
+            role: "orchestrator".to_string(),
+            model_id: other.clone(),
+        },
+        &mut app,
+    );
+
+    assert!(matches!(
+        effects.first(),
+        Some(Effect::ReloadLegionAssignments)
+    ));
+    assert!(effects.iter().any(
+        |effect| matches!(effect, Effect::SwitchModel { model_id, .. } if model_id == &other)
+    ));
+    let agent = app.agents.get(&AgentId(0)).unwrap();
+    assert!(agent.session.model_switch_pending);
+    assert_eq!(agent.session.models.current.as_ref(), Some(&other));
+    assert_eq!(
+        agent.legion_assignments.get("orchestrator"),
+        Some(&other.0.to_string())
+    );
+}
+
+#[test]
+fn legion_orchestrator_assignment_updates_every_open_root() {
+    let mut app = test_app_with_agent();
+    let second_id = AgentId(1);
+    let second_session = make_test_agent_session(&app, second_id, "second-session");
+    app.agents.insert(
+        second_id,
+        AgentView::new(second_session, ScrollbackState::new()),
+    );
+    app.current_ui.permission_mode = Some("legion".to_string());
+    let base = acp::ModelId::new("base-model");
+    let orchestrator = acp::ModelId::new("orchestrator-model");
+    for agent in app.agents.values_mut() {
+        agent.session.models.available.insert(
+            base.clone(),
+            acp::ModelInfo::new(base.clone(), "Base Model".to_string()),
+        );
+        agent.session.models.available.insert(
+            orchestrator.clone(),
+            acp::ModelInfo::new(orchestrator.clone(), "Orchestrator Model".to_string()),
+        );
+        agent.session.models.set_current(base.clone(), None);
+        agent
+            .legion_assignments
+            .insert("orchestrator".to_string(), base.0.to_string());
+    }
+
+    let effects = dispatch(
+        Action::LegionRoleModelAssigned {
+            role: "orchestrator".to_string(),
+            model_id: orchestrator.clone(),
+        },
+        &mut app,
+    );
+
+    assert_eq!(
+        effects
+            .iter()
+            .filter(|effect| matches!(effect, Effect::SwitchModel { model_id, .. } if model_id == &orchestrator))
+            .count(),
+        2,
+        "every open root session must switch to the selected orchestrator"
+    );
+    for agent in app.agents.values() {
+        assert_eq!(
+            agent.legion_assignments.get("orchestrator"),
+            Some(&orchestrator.0.to_string())
+        );
+        assert_eq!(agent.session.models.current.as_ref(), Some(&orchestrator));
+        assert!(agent.session.model_switch_pending);
+    }
+}

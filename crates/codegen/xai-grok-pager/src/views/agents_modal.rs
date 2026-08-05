@@ -158,6 +158,13 @@ pub enum AgentsModalOutcome {
     Close,
     Changed,
     Unchanged,
+    /// A Legion role assignment was persisted. The app layer uses this to
+    /// synchronize the live DAG UI and, for the orchestrator in Legion mode,
+    /// the active session's base model.
+    LegionModelAssigned {
+        role: String,
+        model_id: String,
+    },
     /// User pressed Enter/o — open the agent's full definition in the line viewer.
     /// Contains the source path (if file-based) or in-memory markdown content.
     ViewAgent {
@@ -2731,11 +2738,15 @@ fn assign_selected_legion_model(state: &mut AgentsModalState) -> AgentsModalOutc
         Ok(()) => {
             state
                 .legion_assignments
-                .insert(role_key.to_string(), model_id);
+                .insert(role_key.to_string(), model_id.clone());
             state.legion_picker_open = false;
             state.message = Some(AgentsModalMessage::success(format!(
                 "{role_label} assigned to {model_label}"
             )));
+            return AgentsModalOutcome::LegionModelAssigned {
+                role: role_key.to_string(),
+                model_id,
+            };
         }
         Err(error) => state.message = Some(AgentsModalMessage::error(error)),
     }

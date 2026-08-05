@@ -74,6 +74,17 @@ impl AgentView {
                     refresh_agents_modal: Some(tab),
                 })
             }
+            crate::views::agents_modal::AgentsModalOutcome::LegionModelAssigned {
+                role,
+                model_id,
+            } => {
+                self.legion_assignments
+                    .insert(role.clone(), model_id.clone());
+                InputOutcome::Action(Action::LegionRoleModelAssigned {
+                    role,
+                    model_id: agent_client_protocol::ModelId::new(model_id),
+                })
+            }
             crate::views::agents_modal::AgentsModalOutcome::Changed => InputOutcome::Changed,
             crate::views::agents_modal::AgentsModalOutcome::Unchanged => InputOutcome::Unchanged,
         }
@@ -106,6 +117,17 @@ impl AgentView {
             | crate::views::agents_modal::AgentsModalOutcome::EditInEditor { .. } => {
                 // Mouse interactions don't trigger view/edit — ignore.
                 InputOutcome::Unchanged
+            }
+            crate::views::agents_modal::AgentsModalOutcome::LegionModelAssigned {
+                role,
+                model_id,
+            } => {
+                self.legion_assignments
+                    .insert(role.clone(), model_id.clone());
+                InputOutcome::Action(Action::LegionRoleModelAssigned {
+                    role,
+                    model_id: agent_client_protocol::ModelId::new(model_id),
+                })
             }
             crate::views::agents_modal::AgentsModalOutcome::Changed => InputOutcome::Changed,
             crate::views::agents_modal::AgentsModalOutcome::Unchanged => InputOutcome::Unchanged,

@@ -361,6 +361,38 @@
         );
     }
 
+    #[test]
+    fn legion_remote_model_change_queues_orchestrator_correction() {
+        let mut app = make_app_with_agent("sess-1");
+        app.current_ui.permission_mode = Some("legion".to_string());
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        seed_models(agent, "orchestrator-model", &["orchestrator-model", "remote-model"]);
+        agent.legion_assignments.insert(
+            "orchestrator".to_string(),
+            "orchestrator-model".to_string(),
+        );
+
+        let notif = model_changed_ext("sess-1", "remote-model", None);
+        assert!(handle_ext_notification(&notif, &mut app));
+
+        let agent = app.agents.get(&AgentId(0)).unwrap();
+        assert!(
+            agent.session.model_switch_pending,
+            "Legion must immediately reserve a corrective switch"
+        );
+        assert_eq!(
+            agent.session.models.current_model_id_str(),
+            Some("orchestrator-model"),
+            "the footer must stay on Orchestrator while correction is pending"
+        );
+        assert!(matches!(
+            app.pending_effects.as_slice(),
+            [Effect::SwitchModel { model_id, prev_model_id: Some(previous), .. }]
+                if model_id.0.as_ref() == "orchestrator-model"
+                    && previous.0.as_ref() == "remote-model"
+        ));
+    }
+
     /// A `ModelChanged` broadcast carrying a model id the local catalog
     /// doesn't know about must be dropped — applying it would render an
     /// unresolvable id in the status bar and desync the `/model` dropdown.
@@ -441,4 +473,3 @@
             "unrelated-session broadcast must not touch this agent's model"
         );
     }
-

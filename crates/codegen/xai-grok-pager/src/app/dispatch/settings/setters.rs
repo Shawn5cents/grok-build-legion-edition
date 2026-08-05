@@ -1649,6 +1649,13 @@ pub(in crate::app::dispatch) fn set_default_model(
         );
         return vec![];
     };
+    if !crate::app::dispatch::legion::base_model_change_allowed(app, aid, &new_id) {
+        app.show_toast(
+            "Legion keeps the base model equal to Orchestrator; change it in Agents → Legion",
+        );
+        refresh_open_settings_modals(app);
+        return vec![];
+    }
 
     // Snapshot previous id + display name from the active agent's
     // session (the same source `set_default_model_inner` mutates

@@ -1240,6 +1240,54 @@ fn switch_model_complete_failure_pushes_error_and_clears_pending() {
 }
 
 #[test]
+fn legion_orchestrator_switch_failure_rolls_footer_and_assignment_back() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    let previous = acp::ModelId::new("previous-model");
+    let rejected = acp::ModelId::new("rejected-model");
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        agent.session.models.available.insert(
+            previous.clone(),
+            acp::ModelInfo::new(previous.clone(), "Previous".to_string()),
+        );
+        agent.session.models.available.insert(
+            rejected.clone(),
+            acp::ModelInfo::new(rejected.clone(), "Rejected".to_string()),
+        );
+        agent.session.models.set_current(rejected.clone(), None);
+        agent.session.model_switch_pending = true;
+        agent
+            .legion_assignments
+            .insert("orchestrator".to_string(), rejected.0.to_string());
+    }
+    app.current_ui.permission_mode = Some("legion".to_string());
+
+    let effects = dispatch(
+        Action::TaskComplete(TaskResult::SwitchModelComplete {
+            agent_id: id,
+            model_id: rejected,
+            effort: None,
+            result: Err(SwitchModelError::Other("rejected".into())),
+            prev_model_id: Some(previous.clone()),
+        }),
+        &mut app,
+    );
+
+    let agent = app.agents.get(&id).unwrap();
+    assert_eq!(agent.session.models.current.as_ref(), Some(&previous));
+    assert_eq!(
+        agent.legion_assignments.get("orchestrator"),
+        Some(&previous.0.to_string())
+    );
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::PersistLegionRoleModel { model_id, .. }]
+            if model_id == previous.0.as_ref()
+    ));
+}
+
+#[test]
 fn switch_model_incompatible_agent_shows_question_modal() {
     let mut app = test_app_with_agent();
     let id = AgentId(0);

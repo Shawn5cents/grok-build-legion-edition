@@ -113,6 +113,21 @@ once with a configured fallback model:
 verifier = "deepseek-v4-pro"
 ```
 
+### Legion Base-Model Invariant
+
+Legion keeps the root session's base model equal to the configured
+`orchestrator` model whenever Legion mode is active. Selecting a new
+orchestrator updates the DAG banner, the bottom model indicator, every open
+root session, and the live shell assignment map. New, resumed, and worktree
+sessions use the same orchestrator automatically. The other roles remain
+heterogeneous and continue using their own assignments.
+
+The ordinary `/model` picker and Settings default-model control cannot move a
+Legion root to a different model; change the root model through **Agents →
+Legion → orchestrator** instead. The selected child model is also displayed
+in that subagent's pane and footer, so the UI reflects the model actually used
+for each spawn.
+
 ### Model Preset Switcher (`tools/switch-subagents.sh`)
 
 Switch model presets live without restarting the agent session:

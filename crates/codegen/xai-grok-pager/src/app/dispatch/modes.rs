@@ -1,6 +1,7 @@
 //! Plan, yolo, auto, and permission mode transitions and toasts.
 
 use super::ctx::with_active_agent;
+use super::legion;
 use super::queue::{maybe_drain_queue, note_peek_page_flip};
 use super::session::lifecycle::skip_picker_and_create_session;
 use super::settings::ui::{refresh_open_settings_modals, save_success_toast};
@@ -481,6 +482,7 @@ pub(super) fn set_permission_mode(
             app,
             Some(crate::views::agents_modal::AgentsTab::Legion),
         ));
+        effects.extend(legion::synchronize_all_orchestrators(app));
     }
     effects
 }
@@ -937,6 +939,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 app,
                 Some(crate::views::agents_modal::AgentsTab::Legion),
             ));
+            effects.extend(legion::synchronize_all_orchestrators(app));
             effects
         }
         // Legion Multi-Agent DAG Mode → Normal

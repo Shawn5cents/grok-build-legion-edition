@@ -11,6 +11,7 @@ use crate::app::app_view::{ActiveView, AppView, TrustState};
 use crate::app::dispatch::ctx::{
     SwitchCause, get_active_agent, reseed_tip_for_new_session, show_welcome, switch_to_agent,
 };
+use crate::app::dispatch::legion;
 use crate::app::dispatch::modes::inherit_auto_mode;
 use crate::app::dispatch::prompt::{consume_chat_kind, dispatch_initial_prompt};
 use crate::app::dispatch::queue::{QueueDrain, maybe_drain_queue, note_peek_page_flip};
@@ -370,6 +371,7 @@ pub(in crate::app::dispatch) fn dispatch_new_session_inner_with_id(
             agent.session.prompt_history_loading = true;
         }
         let preferred_session_id = app.deferred_startup.preferred_session_id.take();
+        let model_id = legion::creation_model(app, agent_id, model_id);
         effects.push(Effect::CreateSession {
             agent_id,
             cwd: effective_cwd,
@@ -700,6 +702,7 @@ pub(in crate::app::dispatch) fn dispatch_new_worktree_session(
         agent.session.enqueue_prompt(prompt);
     }
     switch_to_agent(app, agent_id, SwitchCause::New);
+    let model_id = legion::creation_model(app, agent_id, model_id);
     let effects = vec![Effect::CreateWorktreeSession {
         agent_id,
         load_session_id,
@@ -788,10 +791,11 @@ pub(in crate::app::dispatch) fn skip_picker_and_create_session(
         }
     }
     let preferred_session_id = app.deferred_startup.preferred_session_id.take();
+    let model_id = legion::creation_model(app, agent_id, None);
     vec![Effect::CreateSession {
         agent_id,
         cwd: app.cwd.clone(),
-        model_id: None,
+        model_id,
         preferred_session_id,
         chat_kind,
     }]
@@ -803,6 +807,7 @@ pub(in crate::app::dispatch) fn handle_session_created(
     new_models: Option<acp::SessionModelState>,
 ) -> Vec<Effect> {
     let agent_count = app.agents.len();
+    let legion_active = legion::is_active(app);
     let switch_hint =
         crate::views::dashboard::session_switch_hint_command(app.screen_mode.is_minimal());
     if let Some(agent) = app.agents.get_mut(&agent_id) {
@@ -827,6 +832,14 @@ pub(in crate::app::dispatch) fn handle_session_created(
             agent.session.models = app.models.clone();
         }
         let deferred = apply_deferred_model_switch(agent, app.cli_effort_token.as_deref());
+        let deferred = if legion_active {
+            legion::orchestrator_model(agent).and_then(|model_id| {
+                (agent.session.models.current.as_ref() != Some(&model_id))
+                    .then_some((model_id, None))
+            })
+        } else {
+            deferred
+        };
         let deferred_mode = agent.deferred_session_mode.take();
         let cwd = agent.session.cwd.clone();
         if deferred.is_some() {
@@ -911,6 +924,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
     session_cwd: std::path::PathBuf,
     new_models: Option<acp::SessionModelState>,
 ) -> Vec<Effect> {
+    let legion_active = legion::is_active(app);
     if let Some(agent) = app.agents.get_mut(&agent_id) {
         agent.session.finish_command();
         agent.mark_turn_finished();
@@ -928,6 +942,14 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
             worktree_path.display()
         )));
         let deferred = apply_deferred_model_switch(agent, app.cli_effort_token.as_deref());
+        let deferred = if legion_active {
+            legion::orchestrator_model(agent).and_then(|model_id| {
+                (agent.session.models.current.as_ref() != Some(&model_id))
+                    .then_some((model_id, None))
+            })
+        } else {
+            deferred
+        };
         let deferred_mode = agent.deferred_session_mode.take();
         let cwd = agent.session.cwd.clone();
         if deferred.is_some() {
@@ -1128,6 +1150,8 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
     result: Result<(), SwitchModelError>,
     prev_model_id: Option<acp::ModelId>,
 ) -> Vec<Effect> {
+    let legion_active = legion::is_active(app);
+    let mut restore_legion_assignment = false;
     if let Some(agent) = app.agents.get_mut(&agent_id) {
         agent.session.model_switch_pending = false;
         let mut effects = match result {
@@ -1172,15 +1196,22 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                 return open_agent_type_mismatch_question(app, model_id, effort, &display_name);
             }
             Err(SwitchModelError::Other(msg)) => {
+                if legion_active && let Some(ref prev) = prev_model_id {
+                    agent.session.models.set_current(prev.clone(), None);
+                }
                 agent
                     .scrollback
                     .push_block(RenderBlock::system(format!("Couldn't switch model: {msg}")));
+                restore_legion_assignment = legion_active;
                 vec![]
             }
         };
         let drain = maybe_drain_queue(agent);
         effects.extend(drain.effects);
         note_peek_page_flip(app, agent_id, drain.page_flip_entry);
+        if restore_legion_assignment {
+            effects.extend(legion::restore_orchestrator_to_base(app, agent_id));
+        }
         effects
     } else {
         vec![]
@@ -1204,6 +1235,11 @@ pub(in crate::app::dispatch) fn dispatch_agent_type_mismatch_answered(
         }
         effects
     } else {
+        if legion::is_active(app)
+            && let ActiveView::Agent(agent_id) = app.active_view
+        {
+            return legion::restore_orchestrator_to_base(app, agent_id);
+        }
         vec![]
     }
 }

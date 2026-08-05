@@ -867,3 +867,55 @@
         );
     }
 
+    /// The child pane/footer must use the effective model reported by the
+    /// spawn event, not the root session's current model.
+    #[test]
+    fn spawned_subagent_view_uses_effective_model() {
+        let mut app = make_app_with_agent("sess-parent");
+        let parent_model = acp::ModelId::new("parent-model");
+        let child_model = acp::ModelId::new("child-model");
+        {
+            let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+            agent.session.models.available.insert(
+                parent_model.clone(),
+                acp::ModelInfo::new(parent_model.clone(), "Parent Model".to_string()),
+            );
+            agent.session.models.available.insert(
+                child_model.clone(),
+                acp::ModelInfo::new(child_model.clone(), "Child Model".to_string()),
+            );
+            agent.session.models.set_current(parent_model, None);
+        }
+
+        let mut update = test_subagent_spawned("sess-parent", "child-effective-model");
+        let XaiSessionUpdate::SubagentSpawned { model, .. } = &mut update else {
+            unreachable!();
+        };
+        *model = Some("child-model".to_string());
+
+        assert!(handle(
+            make_ext_session_notification("sess-parent", update),
+            &mut app,
+        ));
+
+        let agent = app.agents.get(&AgentId(0)).unwrap();
+        assert_eq!(
+            agent
+                .subagent_sessions
+                .get("child-effective-model")
+                .and_then(|info| info.model.as_deref()),
+            Some("child-model")
+        );
+        let child = agent
+            .subagent_views
+            .get("child-effective-model")
+            .expect("spawn creates child view");
+        assert_eq!(
+            child.session.models.current_model_id_str(),
+            Some("child-model")
+        );
+        assert_eq!(
+            child.session.models.current_model_name().as_deref(),
+            Some("Child Model")
+        );
+    }

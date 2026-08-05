@@ -544,6 +544,7 @@ pub(super) fn dispatch_open_config_agents_modal(
         active_agent,
     );
     modal.set_legion_models(legion_models);
+    agent.legion_assignments = modal.legion_assignments.clone();
     if let Some(tab) = initial_tab {
         modal.active_tab = tab;
     }

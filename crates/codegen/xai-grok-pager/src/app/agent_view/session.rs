@@ -231,6 +231,7 @@ impl AgentView {
             inline_media_hits: InlineMediaHitAreas::default(),
             extensions_modal: None,
             agents_modal: None,
+            legion_assignments: crate::views::agents_modal::load_legion_assignments(),
             persona_detail: None,
             btw_state: None,
             minimal_btw_lifecycle: None,

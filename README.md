@@ -99,7 +99,7 @@ Legion ships with intuitive interactive tools so you can configure models and pr
 | **`legion-config`** | **Model & Role Editor**: Interactively change models for individual subagent roles or apply **one single LLM to ALL roles at once** (`legion-config --all <model>`). |
 | **`./tools/auto-discover.py`** | **Zero-Touch Capability Scan**: Detects supported provider credentials (`OPENCODE`, `NVIDIA`, `VENICE`, `DEEPSEEK`, `ANTHROPIC`, `XAI`, `OPENAI`, `GEMINI`, `OPENROUTER`, `ZENMUX`, `KIMI`), reports installed AI clients, and probes local model endpoints to generate a routable profile. |
 | **`/connect`** *(inside Legion)* | **Provider Connection Flow**: Validate a provider key without freezing the TUI, discover its models, and add provider-qualified runtime model entries to the live catalog and persistent configuration. |
-| **`/model`** *(inside Legion)* | **Live Model Picker**: Switch to built-in or newly connected provider models immediately; successful `/connect` results appear without restarting Legion. |
+| **`/model`** *(inside Legion)* | **Live Model Picker**: Switch the base model outside Legion; while Legion is active, use **Agents → Legion → orchestrator** so the root base and DAG orchestrator remain synchronized. Successful `/connect` results appear without restarting Legion. |
 
 ---
 
