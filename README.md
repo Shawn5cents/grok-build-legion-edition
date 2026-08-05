@@ -85,6 +85,35 @@ graph TD
     style Repair fill:#5c001e,stroke:#ff4d4f,stroke-width:2px,color:#fff
 ```
 
+### Latest DAG Runtime Updates
+
+The current Legion runtime adds a few important reliability features for
+agentic and OpenAI-compatible models:
+
+- **DeepSeek-ready tool-call repair**: fragmented parallel calls, reasoning
+  content, empty arguments, missing call IDs, and incorrect terminal finish
+  reasons are normalized before tools execute.
+- **Bounded verification workflow**: non-trivial work follows
+  Explore → Plan → Implement → Verify, with at most one evidence-based repair
+  and one verifier recheck.
+- **Independent verifier checks**: the verifier can run focused tests, builds,
+  linters, and endpoint probes, but has no file-editing tools and must return
+  observed PASS/FAIL evidence.
+- **Rate-limit recovery**: configure one fallback model for a role after its
+  primary model exhausts HTTP 429 retries. The fallback is attempted once and
+  does not trigger for ordinary errors.
+
+Example configuration:
+
+```toml
+[subagents.fallback]
+verifier = "deepseek-v4-pro"
+```
+
+These controls work with any provider; DeepSeek is simply a particularly good
+fit because its long-context, tool-using workflow benefits from repeated
+inspection, repair, and verification turns.
+
 ---
 
 ## 🎛️ Interactive Hub & Configuration Tools
@@ -118,6 +147,10 @@ built-in presets under `~/.local`, generates an auto-discovered profile on first
 install, and keeps provider-bearing config files private. Reinstalling preserves
 the active configuration. Set `GROK_HOME` to use a different configuration
 directory.
+
+Legion self-updates exclusively from this repository's GitHub Releases. Release
+tags use `v<VERSION>-legion` (for example, `v0.2.112-legion`) and executable
+assets use `legion-<OS>-<ARCH>` (for example, `legion-linux-x86_64`).
 
 ### 2. Launch an Interactive Session
 
