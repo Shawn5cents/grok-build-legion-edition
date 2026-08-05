@@ -235,6 +235,16 @@ pub struct SubagentsConfig {
     /// ```
     #[serde(default)]
     pub models: std::collections::HashMap<String, String>,
+    /// Per-subagent fallback model IDs used after the primary model exhausts
+    /// its HTTP 429 retry budget. Keys are agent names, matching
+    /// `[subagents.models]`.
+    ///
+    /// ```toml
+    /// [subagents.fallback]
+    /// verifier = "deepseek-v4-pro"
+    /// ```
+    #[serde(default)]
+    pub fallback: std::collections::HashMap<String, String>,
     /// Per-subagent enable/disable toggles.
     /// Keys are agent names, values are booleans.
     /// Omitted agents default to enabled (`true`).

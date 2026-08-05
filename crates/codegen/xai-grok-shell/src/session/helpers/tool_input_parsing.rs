@@ -171,4 +171,15 @@ mod tests {
         assert_eq!(normalize_empty_arguments(r#"{"a":1}"#), r#"{"a":1}"#);
         assert_eq!(normalize_empty_arguments("not json"), "not json");
     }
+
+    #[test]
+    fn deepseek_argument_edge_cases_use_existing_repairs() {
+        assert_eq!(normalize_empty_arguments(""), "{}");
+        let calls =
+            try_extract_concatenated_json_objects(r#"{"path":"src/a.rs"}{"path":"src/b.rs"}"#)
+                .expect("concatenated calls should be recoverable");
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0]["path"], "src/a.rs");
+        assert_eq!(calls[1]["path"], "src/b.rs");
+    }
 }

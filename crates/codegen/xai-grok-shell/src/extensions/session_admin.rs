@@ -602,21 +602,27 @@ fn handle_reload_subagents(agent: &MvpAgent) -> ExtResult {
     let cli_flag = agent.cfg.borrow().cli_subagents.unwrap_or(false);
     let subagents = crate::config::SubagentsConfig::resolve(cli_flag, &disk_config);
     let model_count = subagents.models.len();
+    let fallback_count = subagents.fallback.len();
     {
         let mut config = agent.cfg.borrow_mut();
         config.subagents_enabled = subagents.enabled;
         config.subagent_model_overrides = subagents.models;
+        config.subagent_model_fallbacks = subagents.fallback;
         config.subagent_toggle = subagents.toggle;
         config.subagent_roles = subagents.roles;
         config.subagent_personas = subagents.personas;
     }
     tracing::info!(
         model_count,
+        fallback_count,
         "subagent assignments reloaded from config.toml"
     );
-    ExtMethodResult::success(serde_json::json!({ "models": model_count }))
-        .to_ext_response()
-        .map_err(|e| acp::Error::internal_error().data(e.to_string()))
+    ExtMethodResult::success(serde_json::json!({
+        "models": model_count,
+        "fallbacks": fallback_count
+    }))
+    .to_ext_response()
+    .map_err(|e| acp::Error::internal_error().data(e.to_string()))
 }
 
 // internal/reload_models_cache

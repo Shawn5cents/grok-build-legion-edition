@@ -300,9 +300,13 @@ plan = false
 
 [subagents.models]
 explore = "grok-build"               # route to different models
+
+[subagents.fallback]
+verifier = "deepseek-v4-pro"          # one fallback after terminal HTTP 429
 ```
 
 To pin the model a subagent uses, set its entry under `[subagents.models]`.
+An entry under `[subagents.fallback]` is tried once if that type's selected model exhausts its HTTP 429 retry budget.
 
 ### Goal mode and background workflows
 

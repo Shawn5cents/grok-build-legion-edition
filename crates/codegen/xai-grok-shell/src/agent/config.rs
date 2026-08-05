@@ -1543,6 +1543,11 @@ pub struct Config {
     /// from `SubagentsConfig::resolve()`.
     #[serde(skip)]
     pub subagent_model_overrides: std::collections::HashMap<String, String>,
+    /// Per-subagent fallback model IDs from `[subagents.fallback]`.
+    /// A fallback is attempted once, and only after the primary model's HTTP
+    /// 429 retry budget has been exhausted.
+    #[serde(skip)]
+    pub subagent_model_fallbacks: std::collections::HashMap<String, String>,
     /// Per-subagent enable/disable toggles from `[subagents.toggle]` in config.toml.
     /// Keys are agent names, values are booleans. Omitted agents default to enabled.
     #[serde(skip)]
@@ -1859,6 +1864,7 @@ impl Default for Config {
             cli_agent_overrides: CliAgentOverrides::default(),
             subagents_enabled: true,
             subagent_model_overrides: std::collections::HashMap::new(),
+            subagent_model_fallbacks: std::collections::HashMap::new(),
             subagent_toggle: std::collections::HashMap::new(),
             subagent_roles: std::collections::HashMap::new(),
             subagent_personas: std::collections::HashMap::new(),
@@ -2149,6 +2155,7 @@ impl Config {
         let sa = crate::config::SubagentsConfig::resolve(cli_flag, raw_config);
         self.subagents_enabled = sa.enabled;
         self.subagent_model_overrides = sa.models;
+        self.subagent_model_fallbacks = sa.fallback;
         self.subagent_toggle = sa.toggle;
         self.subagent_roles = sa.roles;
         self.subagent_personas = sa.personas;
@@ -2156,7 +2163,7 @@ impl Config {
     /// Resolve all `#[serde(skip)]` runtime fields that have resolver functions.
     ///
     /// Call immediately after `new_from_toml_cfg()`. Fields resolved:
-    /// - subagents base layers (6 fields) via `SubagentsConfig::resolve`
+    /// - subagents base layers via `SubagentsConfig::resolve`
     /// - respect_gitignore via `ToolsConfig::resolve`
     /// - disable_zdr_incompatible_tools via `ToolsConfig::resolve`
     /// - managed_mcps_enabled via `ManagedMcpsConfig::resolve`

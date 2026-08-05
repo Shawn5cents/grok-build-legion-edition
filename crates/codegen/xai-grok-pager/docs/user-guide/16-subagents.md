@@ -60,8 +60,11 @@ The `spawn_subagent` tool accepts a `subagent_type` parameter that selects the c
 | Type              | Description                                          |
 | ----------------- | ---------------------------------------------------- |
 | `general-purpose` | Default type. Full-capability agent for any task.    |
-| `explore`         | Research agent. Searches, reads, greps, and runs shell commands, but does not edit files. Use it for codebase investigation. |
+| `explore`         | Read-only research agent for searches, reads, and codebase investigation. |
 | `plan`            | Planning agent. Explores the codebase and produces a structured implementation plan; does not edit files. |
+| `architect`       | Read-only architectural designer and planning specialist. |
+| `implementor`     | Full-capability implementation worker for edits, builds, and self-checks. |
+| `verifier`        | Non-editing evaluator that can run tests, builds, linters, and endpoint probes and returns structured PASS/FAIL evidence. |
 
 Project- or user-defined agents can add new types or shadow these built-ins by name.
 
@@ -168,7 +171,7 @@ A capability mode is an optional, coarse filter on a subagent's tools:
 | `execute`    | Yes  | No    | Yes     | Read, plus run shell commands and background tasks. No file edits. |
 | `all`        | Yes  | Yes   | Yes     | Unrestricted tool access.                    |
 
-If you omit `capability_mode`, the subagent uses its agent type's toolset. The built-in `explore` and `plan` types read, search, and run shell commands but cannot edit files; `general-purpose` ships the full toolset.
+If you omit `capability_mode`, the subagent uses its agent type's toolset. The built-in `explore`, `plan`, and `architect` types are read-only; `verifier` adds command execution without direct editing; `general-purpose` and `implementor` ship the full toolset.
 
 ---
 
@@ -244,9 +247,13 @@ plan = false                         # disable the plan subagent
 
 [subagents.models]
 explore = "grok-build"               # route explore to a specific model
+
+[subagents.fallback]
+verifier = "deepseek-v4-pro"          # one fallback after terminal HTTP 429
 ```
 
 Per-type model overrides apply for any parent. Without an override, a subagent inherits the parent's model.
+Fallbacks are attempted at most once, only after the selected model exhausts its normal HTTP 429 retry budget. Other errors do not trigger a provider switch.
 
 ### Custom Roles and Personas
 
