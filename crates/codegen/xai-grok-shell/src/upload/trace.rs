@@ -252,7 +252,7 @@ pub(crate) async fn resolve_git_repo_info(cwd: &str) -> (Option<String>, Option<
 }
 fn classify_workspace(cwd: &str) -> String {
     let path = std::path::Path::new(cwd);
-    if path.ancestors().any(|p| p.join(".git").exists()) {
+    if xai_file_utils::workspace_classifier::is_git_project_dir(path) {
         "git".to_owned()
     } else if xai_file_utils::workspace_classifier::is_project_dir(path) {
         "project".to_owned()

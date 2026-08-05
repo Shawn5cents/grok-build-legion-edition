@@ -25,13 +25,7 @@ pub fn is_project_dir(cwd: &Path) -> bool {
         return false;
     }
 
-    // A repository created inside a temporary directory is still a project,
-    // but an ambient `.git` mounted at the temporary root must not turn every
-    // unrelated temporary path into one.
-    if cwd
-        .ancestors()
-        .any(|p| p.join(".git").exists() && !is_platform_system_root(p))
-    {
+    if is_git_project_dir(cwd) {
         return true;
     }
 
@@ -62,8 +56,22 @@ pub fn is_project_dir(cwd: &Path) -> bool {
     true
 }
 
+/// Returns whether `cwd` is inside a Git tree whose marker belongs to the
+/// project rather than to an ambient system or temporary-directory mount.
+pub fn is_git_project_dir(cwd: &Path) -> bool {
+    // A repository created inside a temporary directory is still a project,
+    // but an ambient `.git` mounted at the temporary root must not turn every
+    // unrelated temporary path into one.
+    cwd.ancestors()
+        .any(|p| p.join(".git").exists() && !is_platform_system_root(p))
+}
+
 #[cfg(not(target_os = "windows"))]
 fn is_platform_system_root(path: &Path) -> bool {
+    if path.parent().is_none() {
+        return true;
+    }
+
     matches!(
         path.to_str(),
         Some("/tmp")
@@ -77,6 +85,10 @@ fn is_platform_system_root(path: &Path) -> bool {
 
 #[cfg(target_os = "windows")]
 fn is_platform_system_root(path: &Path) -> bool {
+    if path.parent().is_none() {
+        return true;
+    }
+
     if std::env::var("TEMP")
         .or_else(|_| std::env::var("TMP"))
         .is_ok_and(|temp| path == Path::new(&temp))
