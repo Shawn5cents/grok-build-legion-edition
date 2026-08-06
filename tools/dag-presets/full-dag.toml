@@ -8,7 +8,7 @@
 #   explore                   deepseek-v4-flash
 #   plan / implementor        claude-opus-5
 #   architect                 gpt-5.6-sol
-#   verifier                  deepseek-v4-pro
+#   verifier                  grok-4.5            (schema-safe; deepseek fallback)
 #   general-purpose           deepseek-v4-pro
 # Fallbacks are cross-vendor where it matters (see [subagents.fallback]).
 # AUTH: launch grok from a shell that sourced ~/.zshrc (all four API keys in process env).
@@ -23,7 +23,7 @@ explore = "deepseek-v4-flash"
 plan = "claude-opus-5"
 architect = "gpt-5.6-sol"
 implementor = "claude-opus-5"
-verifier = "deepseek-v4-pro"
+verifier = "grok-4.5"
 general-purpose = "deepseek-v4-pro"
 
 [subagents.fallback]
@@ -32,7 +32,7 @@ explore = "gpt-5.6-luna"
 plan = "gpt-5.6-sol"
 architect = "grok-4.5"
 implementor = "deepseek-v4-pro"
-verifier = "grok-4.5"
+verifier = "deepseek-v4-pro"
 general-purpose = "gpt-5.6-luna"
 
 [model.deepseek-v4-pro]
