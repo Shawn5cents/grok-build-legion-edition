@@ -113,6 +113,11 @@ once with a configured fallback model:
 verifier = "deepseek-v4-pro"
 ```
 
+The `verifier` role is also registered in the shared task catalog as a
+read-only built-in subagent. This keeps direct `subagent_type = "verifier"`
+spawns consistent with Legion's role-based verifier edge and prevents hosts
+from treating the dedicated verifier as an unknown custom type.
+
 ### Legion Base-Model Invariant
 
 Legion keeps the root session's base model equal to the configured
