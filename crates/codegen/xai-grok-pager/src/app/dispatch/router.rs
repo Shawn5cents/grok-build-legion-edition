@@ -929,6 +929,15 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             }
         }
         Action::AnnouncementsOpenCta(surface) => {
+            // A pending binary update owns the upgrade CTA. Route it through
+            // the fork-aware updater instead of opening a subscription URL
+            // from an upstream announcement.
+            if app.pending_update_version.is_some() {
+                let mut effects = unregister_all_active_sessions(app);
+                app.quit_for_update = true;
+                effects.push(Effect::Quit);
+                return effects;
+            }
             if let Some((promo, url)) = crate::views::announcements::promo_cta_target(
                 &app.active_announcements,
                 &app.hidden_announcement_ids,
