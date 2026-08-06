@@ -2437,7 +2437,26 @@ impl SessionActor {
                     final_answer_text.as_ref(),
                 ) {
                     (Some(validator), Some(text)) => {
-                        Some(validate_structured_output(validator, text))
+                        let validated = validate_structured_output(validator, text);
+                        if let Err(err) = &validated
+                            && structured_output_retries < STRUCTURED_OUTPUT_MAX_RETRIES
+                        {
+                            structured_output_retries += 1;
+                            tracing::warn!(
+                                prompt_id = %req_id,
+                                attempt = structured_output_retries,
+                                max = STRUCTURED_OUTPUT_MAX_RETRIES,
+                                error = %err,
+                                "native structured-output validation failed — pushing corrective feedback and retrying"
+                            );
+                            self.push_system_reminder(&format!(
+                                "Your previous assistant response failed structured-output \
+                                 validation: {err}\nFix the response and try again. Output JSON \
+                                 that matches the required schema exactly."
+                            ));
+                            continue;
+                        }
+                        Some(validated)
                     }
                     _ => None,
                 };

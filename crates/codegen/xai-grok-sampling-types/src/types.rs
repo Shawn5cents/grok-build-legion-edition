@@ -460,6 +460,7 @@ impl ToolCallRequest {
 pub struct ChatCompletionResponse {
     pub id: String,
     pub object: String,
+    #[serde(default)]
     pub created: u64,
     pub model: String,
     pub choices: Vec<ChatChoice>,
@@ -573,6 +574,7 @@ pub struct CompletionTokensDetails {
 pub struct ChatCompletionChunk {
     pub id: String,
     pub object: String,
+    #[serde(default)]
     pub created: u64,
     pub model: String,
     pub choices: Vec<ChatChunkChoice>,

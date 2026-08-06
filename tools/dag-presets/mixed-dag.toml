@@ -30,8 +30,8 @@ enabled = true
 orchestrator = "deepseek-v4-pro"
 explore = "deepseek-v4-flash"
 plan = "minimax-m3"
-architect = "minimax-m3"
-implementor = "deepseek-v4-pro"
+architect = "gpt-5.6-luna"
+implementor = "minimax-m3"
 verifier = "qwen3-flash"
 general-purpose = "deepseek-v4-pro"
 
@@ -70,7 +70,7 @@ context_window = 1000000
 model = "qwen/qwen3.7-flash"
 base_url = "https://openrouter.ai/api/v1"
 name = "Qwen3.7 Flash (via OpenRouter)"
-api_backend = "responses"
+api_backend = "chat_completions"
 env_key = ["OPENROUTER_API_KEY"]
 context_window = 1000000
 
