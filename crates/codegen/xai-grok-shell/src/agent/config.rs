@@ -4010,6 +4010,12 @@ pub struct ConfigModelOverride {
     pub supports_reasoning_effort: Option<bool>,
     pub reasoning_efforts: Vec<ReasoningEffortOption>,
     pub supports_backend_search: Option<bool>,
+    /// When false, use the `StructuredOutput` tool instead of a native
+    /// `response_format` json_schema, even on a backend that supports it.
+    /// DeepSeek / MiniMax / Qwen-via-OpenRouter reject native json_schema
+    /// with HTTP 400, so their `[model.<id>]` blocks set this false.
+    /// `None` inherits the base entry (default `true`).
+    pub supports_structured_output: Option<bool>,
     /// Aliases must be registered in `config_model_override_parse::ALIASES`;
     /// serde rejects a table that contains both spellings otherwise.
     #[serde(alias = "send_compactions_remaining")]
@@ -4098,6 +4104,9 @@ impl ConfigModelOverride {
         }
         if let Some(v) = self.supports_backend_search {
             entry.info.supports_backend_search = v;
+        }
+        if let Some(v) = self.supports_structured_output {
+            entry.info.supports_structured_output = v;
         }
         if self.compactions_remaining.is_some() {
             entry.info.compactions_remaining = self.compactions_remaining;
@@ -7035,6 +7044,70 @@ reasoning_effort = "low"
         assert!(
             !entry.info.show_model_fingerprint,
             "Some(false) override should disable show_model_fingerprint over a true base"
+        );
+    }
+    /// FT-009: `[model.<id>] supports_structured_output = false` must survive
+    /// the override merge — otherwise the sampler emits a native
+    /// `response_format` json_schema that DeepSeek/Qwen reject with HTTP 400.
+    #[test]
+    fn config_override_applies_supports_structured_output() {
+        let endpoints = EndpointsConfig::default();
+        let off = ConfigModelOverride {
+            supports_structured_output: Some(false),
+            ..Default::default()
+        };
+        assert!(
+            !off.apply("m", None, &endpoints)
+                .info
+                .supports_structured_output,
+            "Some(false) override should disable supports_structured_output"
+        );
+        let base = ModelEntry::fallback("m", &endpoints);
+        assert!(
+            ConfigModelOverride::default()
+                .apply("m", Some(base), &endpoints)
+                .info
+                .supports_structured_output,
+            "None override should preserve the base entry's supports_structured_output"
+        );
+        let mut base = ModelEntry::fallback("m", &endpoints);
+        base.info.supports_structured_output = false;
+        let on = ConfigModelOverride {
+            supports_structured_output: Some(true),
+            ..Default::default()
+        };
+        assert!(
+            on.apply("m", Some(base), &endpoints)
+                .info
+                .supports_structured_output,
+            "Some(true) override should re-enable supports_structured_output over a false base"
+        );
+    }
+    /// FT-009 end-to-end: the TOML flag has to reach the resolved
+    /// `ModelInfo`, not just the override struct.
+    #[test]
+    fn user_override_parses_supports_structured_output_from_toml() {
+        let dm = crate::models::default_model();
+        let raw_config: toml::Value = toml::from_str(&format!(
+            r#"
+            [model."{dm}"]
+            supports_structured_output = false
+            "#,
+        ))
+        .unwrap();
+        let cfg = Config::new_from_toml_cfg(&raw_config).expect("config should parse");
+        assert!(
+            cfg.config_warnings.is_empty(),
+            "supports_structured_output should parse without warnings: {:?}",
+            cfg.config_warnings
+        );
+        let model = resolve_model_list(&cfg, None)
+            .get(dm)
+            .expect("model should exist")
+            .clone();
+        assert!(
+            !model.info.supports_structured_output,
+            "TOML `supports_structured_output = false` should reach the resolved model"
         );
     }
     #[test]

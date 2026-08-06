@@ -548,6 +548,24 @@ mod tests {
         );
     }
 
+    /// FT-009: the field must be *known*, not silently dropped as unknown —
+    /// dropping it forced native response_format onto DeepSeek/Qwen (400).
+    #[test]
+    fn supports_structured_output_is_a_known_field() {
+        let (models, warnings) = parse_raw(
+            r#"
+            [model.m]
+            model = "m"
+            supports_structured_output = false
+            "#,
+        );
+        assert_eq!(
+            models.get("m").unwrap().supports_structured_output,
+            Some(false)
+        );
+        assert_eq!(warnings, Vec::new());
+    }
+
     /// An unknown field warns the same whether or not another field fails to
     /// parse.
     #[test]
@@ -707,6 +725,7 @@ mod tests {
                 default: true,
             }],
             supports_backend_search: Some(false),
+            supports_structured_output: Some(false),
             compactions_remaining: Some(CompactionsRemaining::Fixed(1)),
             compaction_at_tokens: Some(CompactionAtTokens::Fixed(100_000)),
             show_model_fingerprint: Some(true),
