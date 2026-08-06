@@ -62,7 +62,7 @@ context_window = 1000000
 model = "MiniMax-M3"
 base_url = "https://api.minimax.io/v1"
 name = "MiniMax M3"
-api_backend = "responses"
+api_backend = "chat_completions"
 env_key = ["MINIMAX_API_KEY"]
 context_window = 1000000
 
@@ -103,6 +103,14 @@ permission_mode = "always-approve"
 
 [features]
 remote_fetch = false
+
+# Goal DAG role → model routing (planner/strategist/verifier skeptics)
+# Each role spawns as general-purpose with a harness override;
+# the model field routes to the DAG-assigned provider.
+[goal]
+planner_model = { model = "minimax-m3", agent_type = "general-purpose" }
+strategist_model = { model = "gpt-5.6-luna", agent_type = "general-purpose" }
+skeptic_models = [{ model = "qwen3-flash", agent_type = "general-purpose" }]
 
 [models]
 default = "deepseek-v4-pro"

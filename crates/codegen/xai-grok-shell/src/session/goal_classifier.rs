@@ -16,7 +16,7 @@ pub(crate) mod evidence;
 
 use crate::session::events::{Event, GoalClassifierFailOpenReason};
 use crate::session::goal_planner::{
-    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, GOAL_ROLE_SUBAGENT_TYPE, RoleRenderedPrompt,
+    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, RoleRenderedPrompt,
     RoleSpawnOverride, spawn_with_fail_open_retry,
 };
 use crate::session::goal_role_tools::RoleToolNames;
@@ -85,12 +85,14 @@ pub(crate) const GOAL_CLASSIFIER_CHANGES_PATH_TEMPLATE: &str =
 /// rule 5.
 const GIT_BASELINE_CAPTURE_TIMEOUT: Duration = Duration::from_secs(1);
 
-/// Subagent type used for each verifier-skeptic spawn. `general-purpose`
-/// gives the subagent the full read/grep/file tool inventory needed
-/// to corroborate diff hunks against the workspace — the verifier
-/// prompt explicitly forbids workspace mutation. The configured `agent_type`
-/// selects the HARNESS, not this subagent type.
-const GOAL_CLASSIFIER_SUBAGENT_TYPE: &str = GOAL_ROLE_SUBAGENT_TYPE;
+/// DAG-routed subagent type for verifier skeptics. `verifier` gives
+/// the subagent read/grep/execute inventory to corroborate diff hunks
+/// and run test/lint probes against the workspace — the verifier prompt
+/// explicitly forbids workspace mutation. Model routes via
+/// `[subagents.models].verifier` (qwen3-flash in mixed DAG) for a true
+/// cross-family verification edge. The configured `agent_type` selects
+/// the HARNESS, not this subagent type.
+const GOAL_CLASSIFIER_SUBAGENT_TYPE: &str = "verifier";
 
 /// Description shown in the pager subagent strip. Kept short — the
 /// stage may spawn up to `GOAL_VERIFIER_SKEPTIC_MAX` skeptics per

@@ -773,7 +773,7 @@ impl SessionActor {
             let parent_session_id = self.session_id_string();
             let outcome = backend
                 .describe_subagent_type(
-                    crate::session::goal_planner::GOAL_ROLE_SUBAGENT_TYPE,
+                    crate::session::goal_planner::goal_role_subagent_type(role),
                     Some(&pair.agent_type),
                     &parent_session_id,
                 )

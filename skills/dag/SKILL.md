@@ -1,9 +1,6 @@
 ---
 name: dag
-description: >
-  /dag status — show active preset  |  /dag full — flagship multi-vendor (Grok+Claude+GPT+DeepSeek)
-  |  /dag mixed — multi-family economy (DeepSeek+MiniMax+Qwen)  |  /dag economy — DeepSeek-primary
-  |  /dag list — show all presets.  Restart TUI required after any switch.
+description: "/dag status | full | mixed | economy | list — switch between Legion DAG presets or check status. Restart TUI after switching."
 metadata:
   short-description: "/dag status | full | mixed | economy | list"
   user-invocable: true

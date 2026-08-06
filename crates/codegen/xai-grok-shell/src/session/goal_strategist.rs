@@ -22,7 +22,7 @@
 
 use crate::session::events::{Event, GoalStrategistFailReason, GoalStrategistRestoreFailReason};
 use crate::session::goal_planner::{
-    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, GOAL_ROLE_SUBAGENT_TYPE, RoleRenderedPrompt,
+    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, RoleRenderedPrompt,
     RoleSpawnOverride, SpawnError, parse_terminal_response, spawn_with_fail_open_retry,
 };
 use crate::session::goal_role_tools::RoleToolNames;
@@ -36,11 +36,12 @@ use xai_grok_tools::implementations::grok_build::task::types::{
 
 // Constants
 
-/// Same general-purpose inventory each verifier skeptic / the planner
-/// uses: the strategist reads and greps the workspace to diagnose why
-/// the goal is stuck. The configured `agent_type` selects the HARNESS, not
-/// this subagent type.
-const GOAL_STRATEGIST_SUBAGENT_TYPE: &str = GOAL_ROLE_SUBAGENT_TYPE;
+/// DAG-routed subagent type: `architect` gives the strategist
+/// read/grep inventory to diagnose why the goal is stuck — no write
+/// access needed. Model routes via `[subagents.models].architect`
+/// (gpt-5.6-luna in mixed DAG) for cross-family structural diagnosis.
+/// The configured `agent_type` selects the HARNESS, not this subagent type.
+const GOAL_STRATEGIST_SUBAGENT_TYPE: &str = "architect";
 
 /// Description shown in the pager subagent strip and matched by the
 /// e2e coordinator stub to distinguish strategist spawns from skeptics.
