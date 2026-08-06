@@ -17,7 +17,7 @@ Agents and personas both customize behavior, but they operate at different level
 | **How you set them** | At startup, or with agent definitions (`.md` files in `.grok/agents/` or `~/.grok/agents/`) | In `config.toml` (`[subagents.personas]`) or `.toml` files under `.grok/personas/`; applied during subagent resolution |
 | **What they control** | Model, tool availability, prompt body, skills | Tone, output format, task focus, and input/output contracts |
 | **Who edits them** | You -- create, delete, or toggle them in the agents modal or by editing files | You -- define custom personas in config or files; bundled personas are read-only |
-| **Examples** | `grok-build`, `explore`, `plan` | `researcher`, `concise` |
+| **Examples** | `grok-build`, `explore`, `plan`, `verifier` | `researcher`, `concise` |
 
 An agent defines the session itself. A persona shapes how a subagent behaves within a session. A subagent always runs as an agent type (for example, `general-purpose`), and resolution can layer a persona on top.
 
@@ -171,7 +171,9 @@ A capability mode is an optional, coarse filter on a subagent's tools:
 | `execute`    | Yes  | No    | Yes     | Read, plus run shell commands and background tasks. No file edits. |
 | `all`        | Yes  | Yes   | Yes     | Unrestricted tool access.                    |
 
-If you omit `capability_mode`, the subagent uses its agent type's toolset. The built-in `explore`, `plan`, and `architect` types are read-only; `verifier` adds command execution without direct editing; `general-purpose` and `implementor` ship the full toolset.
+If you omit `capability_mode`, the subagent uses its agent type's toolset. The built-in `explore`, `plan`, and `architect` types are read-only; `verifier` is the dedicated contractive, read-only evaluator that adds command execution without direct editing; `general-purpose` and `implementor` ship the full toolset.
+
+The shared task catalog advertises the same `verifier` type to every host. It is resolved as a built-in profile rather than a user-defined agent, so calls such as `subagent_type: "verifier"` work consistently across the CLI and interactive agent hosts.
 
 ---
 

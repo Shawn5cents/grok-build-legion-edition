@@ -772,6 +772,23 @@ Workspace boundary:
 - Your default analysis scope is the workspace in <user_info>. Stay within it unless asked otherwise.
 - Note explicitly if the design requires understanding external dependencies.";
 
+/// Prompt body for the read-only contractive verifier subagent.
+pub const VERIFIER_PROMPT: &str = "\
+You are an independent, contractive verifier. Validate the assigned work; do not extend it.
+
+=== READ-ONLY MODE ===
+You have NO file-editing tools. Do not create, modify, delete, stage, or commit files.\
+${%- if tools.by_kind.execute %} Use ${{ tools.by_kind.execute }} only for read-only verification commands such as focused tests, linters, builds, git diff/status, or endpoint probes.\
+${%- endif %}
+
+Verification contract:
+1. Read the task requirements and inspect the relevant diff and files.
+2. Run the smallest decisive checks that exercise the changed behavior. Do not claim a check ran unless you observed its output.
+3. Report PASS only when the requirements are met and the checks support it; otherwise report FAIL with actionable evidence.
+4. Include exact commands, outcomes, and file/line references for failures. Never fix a failure yourself.
+
+Return a concise evidence-backed verification report.";
+
 /// The **general-purpose** built-in subagent.
 pub const GENERAL_PURPOSE_SUBAGENT: BuiltinSubagent = BuiltinSubagent {
     name: "general-purpose",
@@ -804,9 +821,23 @@ pub const PLAN_SUBAGENT: BuiltinSubagent = BuiltinSubagent {
     prompt_template: PLAN_PROMPT,
 };
 
+/// The **verifier** built-in subagent.
+pub const VERIFIER_SUBAGENT: BuiltinSubagent = BuiltinSubagent {
+    name: "verifier",
+    description: "Read-only contractive verifier for tests, builds, and evidence.",
+    tools_template: "Read-only — can inspect and verify with: \
+         ${{ tools.by_kind.execute }}, ${{ tools.by_kind.read }}, \
+         ${{ tools.by_kind.list }}, and ${{ tools.by_kind.search }}.",
+    prompt_template: VERIFIER_PROMPT,
+};
+
 /// The built-in subagent types advertised to the model, in display order.
-pub const BUILTIN_SUBAGENTS: [BuiltinSubagent; 3] =
-    [GENERAL_PURPOSE_SUBAGENT, EXPLORE_SUBAGENT, PLAN_SUBAGENT];
+pub const BUILTIN_SUBAGENTS: [BuiltinSubagent; 4] = [
+    GENERAL_PURPOSE_SUBAGENT,
+    EXPLORE_SUBAGENT,
+    PLAN_SUBAGENT,
+    VERIFIER_SUBAGENT,
+];
 
 /// Look up a built-in subagent by its `subagent_type` name
 /// (e.g. `"explore"`), or `None` for user-defined / unknown types.
@@ -1226,7 +1257,7 @@ mod tests {
     fn builtin_subagent_catalog_names_and_descriptor_conversion() {
         assert_eq!(
             BUILTIN_SUBAGENTS.map(|b| b.name),
-            ["general-purpose", "explore", "plan"]
+            ["general-purpose", "explore", "plan", "verifier"]
         );
 
         let desc = EXPLORE_SUBAGENT.to_descriptor(&plain_tool_naming());
@@ -1258,6 +1289,10 @@ mod tests {
             builtin_subagent_by_name("plan").map(|b| b.prompt_template),
             Some(PLAN_PROMPT)
         );
+        assert_eq!(
+            builtin_subagent_by_name("verifier").map(|b| b.prompt_template),
+            Some(VERIFIER_PROMPT)
+        );
         assert!(builtin_subagent_by_name("code-reviewer").is_none());
     }
 
@@ -1278,6 +1313,7 @@ mod tests {
         // Read-only profiles carry the read-only banner; general-purpose doesn't.
         assert!(EXPLORE_PROMPT.contains("=== READ-ONLY MODE ==="));
         assert!(PLAN_PROMPT.contains("=== READ-ONLY MODE ==="));
+        assert!(VERIFIER_PROMPT.contains("=== READ-ONLY MODE ==="));
         assert!(!GENERAL_PURPOSE_PROMPT.contains("READ-ONLY"));
     }
 
