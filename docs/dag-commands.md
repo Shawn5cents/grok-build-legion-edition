@@ -4,6 +4,11 @@ The `/dag` slash commands let you switch between Legion Multi-Agent DAG presets
 directly from within the TUI, without leaving your session. They're backed by a
 skill (`dag/SKILL.md`) and a shell script (`tools/dag-switch.sh`).
 
+> **Current release:** v0.2.120. The role tables below reflect the presets as
+> retested on 2026-08-06. For the agent-level release map — commit lineage,
+> closed and open fix tickets, the code map, and the build/install gotcha — see
+> [`docs/v0.2.120.md`](./v0.2.120.md).
+
 ## Commands
 
 | Command | Action |
@@ -77,18 +82,22 @@ dag-switch.sh         ← Shell: copies preset to config.toml, writes dag-mode l
 | Plan | `minimax-m3` |
 | Architect | `gpt-5.6-luna` |
 | Implementor | `minimax-m3` |
-| Verifier | `deepseek-v4-flash` (fallback: `qwen3-flash`) |
+| Verifier | `qwen3-flash` (fallback: `deepseek-v4-flash`) |
 | General-purpose | `deepseek-v4-pro` |
 
 **Cost**: LOW–MEDIUM. Best daily driver — true cross-family verification catches bugs
 a single-model DAG misses. Different LLM families for different roles.
 
-**Requires**: `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`. `OPENROUTER_API_KEY` for Qwen
-fallback. OpenAI optional for Luna fallbacks.
+**Requires**: `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, and `OPENROUTER_API_KEY`
+(Qwen is the verifier **primary** as of v0.2.120, not just a fallback). OpenAI
+optional for Luna fallbacks.
 
-**Note:** DeepSeek models ship with `supports_structured_output = false` so the
-verifier agent type uses the StructuredOutput tool path instead of native
-`response_format` (DeepSeek returns HTTP 400 for that schema type).
+**Note:** DeepSeek, MiniMax, and Qwen models ship with
+`supports_structured_output = false`, so those agent types use the
+StructuredOutput tool path instead of a native `response_format` request (these
+providers return HTTP 400 for that schema type). If the verifier primary still
+hard-fails on a schema request, the subagent falls back once to
+`deepseek-v4-flash` — that is expected behavior, not an error.
 
 ### ECONOMY (`/dag economy`) — DeepSeek-Primary Daily Driver
 

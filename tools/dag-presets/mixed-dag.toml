@@ -12,13 +12,13 @@
 #   plan                      minimax-m3          (different architecture → fresh plans)
 #   architect                 gpt-5.6-luna        (OpenAI ≠ MiniMax → catches design gaps)
 #   implementor               minimax-m3          (strong frontier coder)
-#   verifier                  deepseek-v4-flash   (≠ implementor → REAL verification edge)
+#   verifier                  qwen3-flash         (≠ implementor → REAL verification edge)
 #   general-purpose           deepseek-v4-pro     (safe fallback)
 # FALLBACK:
 #   orchestrator              deepseek-v4-flash
 #   explore / plan / architect / general-purpose   gpt-5.6-luna
 #   implementor               gpt-5.6-luna
-#   verifier                  qwen3-flash         (still ≠ implementor)
+#   verifier                  deepseek-v4-flash   (still ≠ implementor)
 # AUTH: DEEPSEEK_API_KEY + MINIMAX_API_KEY + OPENROUTER_API_KEY.
 #       OPENAI optional for fallbacks.
 # =============================================================================
@@ -32,7 +32,7 @@ explore = "deepseek-v4-flash"
 plan = "minimax-m3"
 architect = "gpt-5.6-luna"
 implementor = "minimax-m3"
-verifier = "deepseek-v4-flash"
+verifier = "qwen3-flash"
 general-purpose = "deepseek-v4-pro"
 
 [subagents.fallback]
@@ -41,7 +41,7 @@ explore = "gpt-5.6-luna"
 plan = "gpt-5.6-luna"
 architect = "minimax-m3"
 implementor = "gpt-5.6-luna"
-verifier = "qwen3-flash"
+verifier = "deepseek-v4-flash"
 general-purpose = "gpt-5.6-luna"
 [model.deepseek-v4-pro]
 model = "deepseek-v4-pro"
