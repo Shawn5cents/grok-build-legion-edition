@@ -896,6 +896,14 @@ pub fn parse_remote_model_value(
             .or_else(|| meta.and_then(|m| m.get("supportsBackendSearch")))
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
+        // Default true; set false for providers that reject native response_format
+        // json_schema (DeepSeek currently returns 400 "response_format type unavailable").
+        supports_structured_output: obj
+            .get("supportsStructuredOutput")
+            .or_else(|| obj.get("supports_structured_output"))
+            .or_else(|| meta.and_then(|m| m.get("supportsStructuredOutput")))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
         compactions_remaining: obj
             .get("compactionsRemaining")
             .or_else(|| obj.get("compactions_remaining"))

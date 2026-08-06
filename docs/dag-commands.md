@@ -74,15 +74,21 @@ dag-switch.sh         ← Shell: copies preset to config.toml, writes dag-mode l
 |---|---|
 | Orchestrator | `deepseek-v4-pro` |
 | Explore | `deepseek-v4-flash` |
-| Plan / Architect | `minimax-m3` |
-| Implementor | `deepseek-v4-pro` |
-| Verifier | `qwen3-flash` (via OpenRouter) |
+| Plan | `minimax-m3` |
+| Architect | `gpt-5.6-luna` |
+| Implementor | `minimax-m3` |
+| Verifier | `deepseek-v4-flash` (fallback: `qwen3-flash`) |
 | General-purpose | `deepseek-v4-pro` |
 
 **Cost**: LOW–MEDIUM. Best daily driver — true cross-family verification catches bugs
 a single-model DAG misses. Different LLM families for different roles.
 
-**Requires**: `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, `OPENROUTER_API_KEY`. OpenAI optional for fallbacks.
+**Requires**: `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`. `OPENROUTER_API_KEY` for Qwen
+fallback. OpenAI optional for Luna fallbacks.
+
+**Note:** DeepSeek models ship with `supports_structured_output = false` so the
+verifier agent type uses the StructuredOutput tool path instead of native
+`response_format` (DeepSeek returns HTTP 400 for that schema type).
 
 ### ECONOMY (`/dag economy`) — DeepSeek-Primary Daily Driver
 
@@ -109,6 +115,22 @@ It also scans `~/.grok/logs/unified.jsonl` for recent inference/auth failures.
 detected. Once dismissed, that specific problem class is silenced permanently
 (until you run `: > ~/.grok/logs/dag-health.last` to reset).
 
+## DAG Watch (real-time subagent failure alerts)
+
+`tools/dag-watch-daemon.sh` tails `~/.grok/logs/unified.jsonl` and fires a macOS
+Notification Center banner + Basso sound on every `subagent failed` event.
+
+```bash
+dag-watch on       # start (LaunchAgent)
+dag-watch off      # stop
+dag-watch status   # running?
+dag-watch log      # tail the log
+```
+
+Notifications sanitize multiline API errors (newlines/quotes previously broke
+`osascript` and were swallowed silently). Notify attempts are also appended to
+`~/.grok/logs/dag-watch-notify.log` for proof of delivery.
+
 ## Files
 
 | File | Purpose |
@@ -116,22 +138,32 @@ detected. Once dismissed, that specific problem class is silenced permanently
 | `skills/dag/SKILL.md` | Skill definition that registers the `/dag` slash commands |
 | `tools/dag-switch.sh` | Shell script that swaps `config.toml` between presets |
 | `tools/dag-health.sh` | Health monitor for DAG provider key status |
+| `tools/dag-watch.sh` | Toggle wrapper for the failure monitor |
+| `tools/dag-watch-daemon.sh` | Real-time subagent failure → macOS notification |
+| `tools/dag-preset-smoke.py` | API smoke-test every primary model in each labeled preset |
 | `tools/dag-presets/full-dag.toml` | Full flagship preset |
 | `tools/dag-presets/mixed-dag.toml` | Mixed multi-family preset |
 | `tools/dag-presets/economy-dag.toml` | Economy DeepSeek-primary preset |
 
 ## Installation
 
+Preferred: run `./install.sh` from the repo root. It builds the binary, installs
+labeled DAG presets into `~/.grok/config-presets/`, installs `dag` / `dag-watch`
+helpers, and loads the dag-watch LaunchAgent on macOS.
+
+Manual:
+
 1. Copy `skills/dag/SKILL.md` to `~/.grok/skills/dag/SKILL.md`
 2. Copy `tools/dag-switch.sh` to `~/.grok/tools/dag-switch.sh` and make executable
 3. Symlink: `ln -s ~/.grok/tools/dag-switch.sh ~/.local/bin/dag`
 4. Copy `tools/dag-presets/*.toml` to `~/.grok/config-presets/`
-5. Copy `tools/dag-health.sh` to `~/.grok/tools/dag-health.sh`
+5. Copy `tools/dag-health.sh`, `tools/dag-watch.sh`, `tools/dag-watch-daemon.sh` to `~/.grok/tools/`
 6. Install the LaunchAgent for health monitoring (optional):
    ```bash
    cp com.michaelnichols.dag-health.plist ~/Library/LaunchAgents/
    launchctl load ~/Library/LaunchAgents/com.michaelnichols.dag-health.plist
    ```
+7. `dag-watch on` for real-time failure banners
 
 ## Troubleshooting
 

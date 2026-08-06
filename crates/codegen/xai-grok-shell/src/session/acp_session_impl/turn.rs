@@ -1965,7 +1965,9 @@ impl SessionActor {
         let schema_ok = matches!(structured_output_validator, Some(Ok(_)));
         let native_backend = if json_schema.is_some() {
             match self.chat_state_handle.get_sampling_config().await {
-                Some(c) => c.api_backend.supports_native_schema(),
+                Some(c) => {
+                    c.api_backend.supports_native_schema() && c.supports_structured_output
+                }
                 None => {
                     tracing::warn!(
                         "structured output: no sampling config; using StructuredOutput tool"

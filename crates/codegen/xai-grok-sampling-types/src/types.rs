@@ -535,8 +535,13 @@ impl ToolCallFunction {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Usage {
+    // MiniMax (and some OpenRouter proxies) omit usage fields or rename them.
+    // Defaults keep deserialization from aborting an otherwise-valid completion.
+    #[serde(default)]
     pub prompt_tokens: u32,
+    #[serde(default)]
     pub completion_tokens: u32,
+    #[serde(default)]
     pub total_tokens: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<PromptTokensDetails>,
@@ -1061,6 +1066,16 @@ pub struct SamplingConfig {
     /// API request body so the upstream emits per-chunk argument deltas.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream_tool_calls: Option<bool>,
+    /// When false, always use the StructuredOutput tool instead of native
+    /// response_format json_schema, even on backends that normally support it.
+    /// Set to false for models that can't produce schema-valid JSON via
+    /// native response_format (e.g., some OpenRouter models like qwen3-flash).
+    #[serde(default = "default_true")]
+    pub supports_structured_output: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 // ============ Responses API wrapper ============

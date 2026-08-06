@@ -48,7 +48,7 @@ base_url = "https://api.deepseek.com/v1"
 name = "DeepSeek V4 Pro"
 env_key = ["DEEPSEEK_API_KEY"]
 context_window = 1000000
-
+supports_structured_output = false
 [model.deepseek-v4-flash]
 model = "deepseek-v4-flash"
 base_url = "https://api.deepseek.com/v1"
@@ -57,6 +57,7 @@ env_key = ["DEEPSEEK_API_KEY"]
 context_window = 1000000
 
 # Fallbacks only — not used as primaries in economy
+supports_structured_output = false
 [model."gpt-5.6-luna"]
 model = "gpt-5.6-luna"
 base_url = "https://api.openai.com/v1"

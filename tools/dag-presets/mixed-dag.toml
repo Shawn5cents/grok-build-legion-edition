@@ -10,15 +10,15 @@
 #   main chat / orchestrator  deepseek-v4-pro     (proven, reliable)
 #   explore                   deepseek-v4-flash   (fastest + cheapest breadth)
 #   plan                      minimax-m3          (different architecture → fresh plans)
-#   architect                 minimax-m3          (≠ implementor → catches design gaps)
-#   implementor               deepseek-v4-pro     (proven code generation)
-#   verifier                  qwen3-flash         (≠ DeepSeek → REAL verification edge)
+#   architect                 gpt-5.6-luna        (OpenAI ≠ MiniMax → catches design gaps)
+#   implementor               minimax-m3          (strong frontier coder)
+#   verifier                  deepseek-v4-flash   (≠ implementor → REAL verification edge)
 #   general-purpose           deepseek-v4-pro     (safe fallback)
 # FALLBACK:
 #   orchestrator              deepseek-v4-flash
 #   explore / plan / architect / general-purpose   gpt-5.6-luna
 #   implementor               gpt-5.6-luna
-#   verifier                  deepseek-v4-flash   (still ≠ implementor)
+#   verifier                  qwen3-flash         (still ≠ implementor)
 # AUTH: DEEPSEEK_API_KEY + MINIMAX_API_KEY + OPENROUTER_API_KEY.
 #       OPENAI optional for fallbacks.
 # =============================================================================
@@ -32,32 +32,31 @@ explore = "deepseek-v4-flash"
 plan = "minimax-m3"
 architect = "gpt-5.6-luna"
 implementor = "minimax-m3"
-verifier = "qwen3-flash"
+verifier = "deepseek-v4-flash"
 general-purpose = "deepseek-v4-pro"
 
 [subagents.fallback]
 orchestrator = "deepseek-v4-flash"
 explore = "gpt-5.6-luna"
 plan = "gpt-5.6-luna"
-architect = "gpt-5.6-luna"
+architect = "minimax-m3"
 implementor = "gpt-5.6-luna"
-verifier = "deepseek-v4-flash"
+verifier = "qwen3-flash"
 general-purpose = "gpt-5.6-luna"
-
 [model.deepseek-v4-pro]
 model = "deepseek-v4-pro"
 base_url = "https://api.deepseek.com/v1"
 name = "DeepSeek V4 Pro"
 env_key = ["DEEPSEEK_API_KEY"]
 context_window = 1000000
-
+supports_structured_output = false
 [model.deepseek-v4-flash]
 model = "deepseek-v4-flash"
 base_url = "https://api.deepseek.com/v1"
 name = "DeepSeek V4 Flash"
 env_key = ["DEEPSEEK_API_KEY"]
 context_window = 1000000
-
+supports_structured_output = false
 [model."minimax-m3"]
 model = "MiniMax-M3"
 base_url = "https://api.minimax.io/v1"
@@ -73,6 +72,7 @@ name = "Qwen3.7 Flash (via OpenRouter)"
 api_backend = "chat_completions"
 env_key = ["OPENROUTER_API_KEY"]
 context_window = 1000000
+supports_structured_output = false
 
 # Fallbacks only — not used as primaries in mixed mode
 [model."gpt-5.6-luna"]
@@ -110,7 +110,7 @@ remote_fetch = false
 [goal]
 planner_model = { model = "minimax-m3", agent_type = "general-purpose" }
 strategist_model = { model = "gpt-5.6-luna", agent_type = "general-purpose" }
-skeptic_models = [{ model = "qwen3-flash", agent_type = "general-purpose" }]
+skeptic_models = [{ model = "deepseek-v4-flash", agent_type = "general-purpose" }]
 
 [models]
 default = "deepseek-v4-pro"

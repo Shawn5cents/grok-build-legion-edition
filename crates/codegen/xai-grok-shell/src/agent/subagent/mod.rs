@@ -757,6 +757,11 @@ async fn read_parent_sampling_config(
                     .model_compaction_at_tokens(ctx.model_id.0.as_ref()),
                 doom_loop_recovery: ctx.sampling_config.doom_loop_recovery,
                 header_injector: ctx.sampling_config.header_injector.clone(),
+                // Honor the live parent sampling flag (and per-model overrides
+                // applied later via resolve_model_override_to_config). Hardcoding
+                // true forced native response_format onto DeepSeek verifiers and
+                // produced 400 "response_format type is unavailable now".
+                supports_structured_output: cfg.supports_structured_output,
             };
             let model_id = ctx.model_id.clone();
             let global_model_id = ctx.models_manager.current_model_id();
