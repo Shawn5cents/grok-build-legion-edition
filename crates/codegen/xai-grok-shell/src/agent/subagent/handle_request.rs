@@ -1270,7 +1270,11 @@ pub(crate) async fn run_shell_child(
     });
     let mut wait_outcome =
         await_subagent_turn_or_cancellation(prompt_rx, cancel_token.clone()).await;
-    if is_rate_limited_wait_outcome(&wait_outcome)
+    if (is_rate_limited_wait_outcome(&wait_outcome)
+        || is_structured_output_failure(
+            &wait_outcome,
+            request.runtime_overrides.output_schema.is_some(),
+        ))
         && let Some(fallback_model) = ctx
             .subagent_model_fallbacks
             .get(&request.subagent_type)

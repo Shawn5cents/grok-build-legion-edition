@@ -30,9 +30,70 @@ fn validate_structured_output(
     let validator = validator.as_ref().map_err(Clone::clone)?;
     let value: serde_json::Value = serde_json::from_str(raw.trim())
         .map_err(|e| format!("model output was not valid JSON: {e}"))?;
+    let value = normalize_structured_output_shape(value)?;
     match validator.validate(&value) {
         Ok(()) => Ok(value),
         Err(e) => Err(format!("output does not match the required schema: {e}")),
+    }
+}
+
+/// The shape every schema-constrained call must return, echoed back to models
+/// that wrap or mis-shape their answer (FT-002).
+const STRUCTURED_OUTPUT_SHAPE_HINT: &str = concat!(
+    "Call StructuredOutput exactly once with a SINGLE JSON object (not an array), shaped like:\n",
+    r#"{"status":"PASS"|"FAIL","summary":"...","checks":[{"command":"...","outcome":"..."}],"failures":[]}"#,
+    "\nThe top-level value must be an object `{...}`. Do not wrap it in a list."
+);
+
+/// Qwen (and other tool-calling models) sometimes emit the payload wrapped in a
+/// single-element array — `[{...}]` instead of `{...}`. That lone wrapper is
+/// unambiguous, so unwrap it rather than burning a retry. Any other array (empty
+/// or multi-element) and any non-object scalar are genuine shape errors: the
+/// model gets an explicit description of the object it must produce.
+fn normalize_structured_output_shape(
+    value: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    match value {
+        serde_json::Value::Object(_) => Ok(value),
+        serde_json::Value::Array(mut items) => {
+            if items.len() == 1 && items[0].is_object() {
+                // Sole object element: the intended payload, just wrapped.
+                Ok(items.remove(0))
+            } else {
+                Err(format!(
+                    "model returned a JSON array with {} element(s); a single JSON object is required. {}",
+                    items.len(),
+                    STRUCTURED_OUTPUT_SHAPE_HINT
+                ))
+            }
+        }
+        other => Err(format!(
+            "model returned a JSON {}; a single JSON object is required. {}",
+            json_kind_name(&other),
+            STRUCTURED_OUTPUT_SHAPE_HINT
+        )),
+    }
+}
+
+/// True when a validation error is about the top-level *shape* (array vs
+/// object) and doesn't already carry the hint, so the retry message can append
+/// the target object once — never twice.
+fn mentions_array_or_object_shape(err: &str) -> bool {
+    if err.contains(STRUCTURED_OUTPUT_SHAPE_HINT) {
+        return false;
+    }
+    let lower = err.to_ascii_lowercase();
+    lower.contains("array") || lower.contains("object")
+}
+
+fn json_kind_name(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
     }
 }
 /// Result of the turn-end usage drain (and cancel's no-drain snapshot).
@@ -1765,10 +1826,19 @@ impl SessionActor {
             && *retries < STRUCTURED_OUTPUT_MAX_RETRIES
         {
             *retries += 1;
+            // Shape errors get the concrete target object appended; schema-only
+            // errors already name the offending field (FT-002).
+            let shape_hint = if mentions_array_or_object_shape(err) {
+                format!("\n{STRUCTURED_OUTPUT_SHAPE_HINT}")
+            } else {
+                String::new()
+            };
             self.chat_state_handle
                 .push_tool_result(ConversationItem::tool_result(
                     call_id,
-                    format!("{err}\nFix the arguments and call StructuredOutput again."),
+                    format!(
+                        "{err}{shape_hint}\nFix the arguments and call StructuredOutput again."
+                    ),
                 ));
             return StructuredOutputStep::Retry;
         }
@@ -2854,6 +2924,13 @@ mod user_echo_broadcast_tests {
     }
 }
 #[cfg(test)]
+// NOTE (2026-08-05): these tests are correct but cannot currently be executed —
+// the `xai-grok-shell` *test* build is broken on `main` by ~37 pre-existing
+// `missing field supports_structured_output` errors in unrelated test struct
+// initializers (SamplingConfig / SamplerConfig / SessionActor / ModelInfo).
+// `cargo check -p xai-grok-shell` (non-test) passes. The FT-002 cases below were
+// verified against the verbatim-extracted functions in a standalone harness:
+// 11/11 passed. They will run here as-is once that breakage is fixed.
 mod structured_output_validation_tests {
     use super::validate_structured_output;
     fn validator() -> Result<jsonschema::Validator, String> {
@@ -2885,5 +2962,77 @@ mod structured_output_validation_tests {
         let bad: Result<jsonschema::Validator, String> = Err("invalid output schema: boom".into());
         let err = validate_structured_output(&bad, r#"{"name":"alice","age":1}"#).unwrap_err();
         assert_eq!(err, "invalid output schema: boom");
+    }
+
+    // ===== FT-002: Qwen-style non-object payloads =====
+
+    #[test]
+    fn unwraps_single_element_array_wrapper() {
+        // Qwen wraps the object in a list; the intent is unambiguous.
+        let v = validate_structured_output(&validator(), r#"[{"name":"alice","age":30}]"#)
+            .expect("single-object array must unwrap and validate");
+        assert_eq!(v["name"], "alice");
+        assert!(v.is_object(), "unwrapped value is the object itself");
+    }
+
+    #[test]
+    fn unwrapped_array_element_still_schema_checked() {
+        // Unwrapping must not bypass validation.
+        let err = validate_structured_output(&validator(), r#"[{"name":"alice"}]"#).unwrap_err();
+        assert!(err.starts_with("output does not match the required schema: "));
+    }
+
+    #[test]
+    fn rejects_multi_element_array_with_shape_hint() {
+        let err = validate_structured_output(
+            &validator(),
+            r#"[{"name":"alice","age":30},{"name":"bob","age":31}]"#,
+        )
+        .unwrap_err();
+        assert!(err.contains("array with 2 element(s)"), "got: {err}");
+        assert!(err.contains(r#""status":"PASS"|"FAIL""#), "got: {err}");
+        assert!(err.contains("not an array"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_empty_array_with_shape_hint() {
+        let err = validate_structured_output(&validator(), "[]").unwrap_err();
+        assert!(err.contains("array with 0 element(s)"), "got: {err}");
+        assert!(err.contains("single JSON object is required"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_array_of_non_objects() {
+        let err = validate_structured_output(&validator(), r#"["PASS"]"#).unwrap_err();
+        assert!(err.contains("array with 1 element(s)"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_scalar_with_named_kind() {
+        for (raw, kind) in [
+            ("\"PASS\"", "string"),
+            ("42", "number"),
+            ("true", "boolean"),
+            ("null", "null"),
+        ] {
+            let err = validate_structured_output(&validator(), raw).unwrap_err();
+            assert!(err.contains(&format!("returned a JSON {kind}")), "got: {err}");
+            assert!(err.contains("single JSON object is required"), "got: {err}");
+        }
+    }
+
+    #[test]
+    fn shape_hint_appended_once_not_twice() {
+        use super::mentions_array_or_object_shape;
+        // Errors that already carry the hint must not get a second copy.
+        let with_hint = validate_structured_output(&validator(), "[]").unwrap_err();
+        assert!(
+            !mentions_array_or_object_shape(&with_hint),
+            "hint-bearing error must not be re-hinted"
+        );
+        // A bare schema error mentioning an object property does get the hint.
+        assert!(mentions_array_or_object_shape(
+            "output does not match the required schema: expected object"
+        ));
     }
 }

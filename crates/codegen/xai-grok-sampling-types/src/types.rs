@@ -1222,6 +1222,97 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    // ===== FT-003: MiniMax-shaped payload tolerance =====
+    //
+    // MiniMax (and some OpenRouter proxies) omit `created` on both the
+    // non-streaming response and streaming chunks, and ship a `usage` object
+    // without the OpenAI token fields. Before `#[serde(default)]` these aborted
+    // the whole completion with "serialization error: missing field ...".
+    // These tests pin that tolerance so the defaults are never dropped.
+
+    #[test]
+    fn minimax_response_missing_created_and_usage_token_fields_deserializes() {
+        let raw = json!({
+            "id": "chatcmpl-minimax-1",
+            "object": "chat.completion",
+            // no "created"
+            "model": "minimax-m3",
+            "choices": [{
+                "index": 0,
+                "message": { "role": "assistant", "content": "hello" },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                // no prompt_tokens / completion_tokens / total_tokens
+                "prompt_tokens_details": { "cached_tokens": 7 }
+            }
+        });
+
+        let resp: ChatCompletionResponse =
+            serde_json::from_value(raw).expect("MiniMax response must deserialize with defaults");
+
+        assert_eq!(resp.created, 0, "missing `created` defaults to 0");
+        assert_eq!(resp.id, "chatcmpl-minimax-1");
+        assert_eq!(resp.model, "minimax-m3");
+
+        let usage = resp.usage.expect("usage present");
+        assert_eq!(usage.prompt_tokens, 0, "missing prompt_tokens defaults to 0");
+        assert_eq!(
+            usage.completion_tokens, 0,
+            "missing completion_tokens defaults to 0"
+        );
+        assert_eq!(usage.total_tokens, 0, "missing total_tokens defaults to 0");
+        assert_eq!(
+            usage
+                .prompt_tokens_details
+                .expect("details preserved")
+                .cached_tokens,
+            7,
+            "present nested fields still parse"
+        );
+
+        let choice = &resp.choices[0];
+        assert_eq!(choice.message.content.as_deref(), Some("hello"));
+        assert_eq!(choice.finish_reason, Some(FinishReason::Stop));
+    }
+
+    #[test]
+    fn minimax_chunk_missing_created_deserializes() {
+        let raw = json!({
+            "id": "chatcmpl-minimax-2",
+            "object": "chat.completion.chunk",
+            // no "created"
+            "model": "minimax-m3",
+            "choices": [{
+                "index": 0,
+                "delta": { "content": "partial" }
+            }]
+        });
+
+        let chunk: ChatCompletionChunk =
+            serde_json::from_value(raw).expect("MiniMax chunk must deserialize with defaults");
+
+        assert_eq!(chunk.created, 0, "missing `created` defaults to 0");
+        assert_eq!(chunk.id, "chatcmpl-minimax-2");
+        assert!(chunk.usage.is_none(), "absent usage stays None");
+        assert_eq!(chunk.choices[0].delta.content.as_deref(), Some("partial"));
+    }
+
+    #[test]
+    fn minimax_empty_usage_object_deserializes_to_all_zero() {
+        // Most degenerate observed shape: `"usage": {}`.
+        let usage: Usage = serde_json::from_value(json!({})).expect("empty usage object is valid");
+        assert_eq!(
+            (
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                usage.total_tokens
+            ),
+            (0, 0, 0)
+        );
+        assert!(usage.cost_in_usd_ticks.is_none());
+    }
+
     #[test]
     fn reasoning_effort_serde_lowercase_round_trip() {
         for v in [

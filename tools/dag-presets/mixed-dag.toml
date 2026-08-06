@@ -48,6 +48,7 @@ model = "deepseek-v4-pro"
 base_url = "https://api.deepseek.com/v1"
 name = "DeepSeek V4 Pro"
 env_key = ["DEEPSEEK_API_KEY"]
+api_backend = "chat_completions"
 context_window = 1000000
 supports_structured_output = false
 [model.deepseek-v4-flash]
@@ -55,6 +56,7 @@ model = "deepseek-v4-flash"
 base_url = "https://api.deepseek.com/v1"
 name = "DeepSeek V4 Flash"
 env_key = ["DEEPSEEK_API_KEY"]
+api_backend = "chat_completions"
 context_window = 1000000
 supports_structured_output = false
 [model."minimax-m3"]
@@ -64,6 +66,9 @@ name = "MiniMax M3"
 api_backend = "chat_completions"
 env_key = ["MINIMAX_API_KEY"]
 context_window = 1000000
+# MiniMax rejects native json_schema response_format; force the
+# StructuredOutput tool path instead of a provider 400 (FT-008).
+supports_structured_output = false
 
 [model."qwen3-flash"]
 model = "qwen/qwen3.7-flash"

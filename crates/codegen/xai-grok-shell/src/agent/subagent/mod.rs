@@ -1741,6 +1741,38 @@ fn is_fallback_worthy_prompt_error(error: &acp::Error) -> bool {
             && (blob.contains("response_format") || blob.contains("json_schema"))
         // MiniMax intermittent serialization aborts on the primary path.
         || blob.contains("serialization error") && blob.contains("missing field")
+        // Schema-constrained turns that came back unusable: the model either
+        // never produced the structured payload or produced one that failed
+        // validation. Another family usually clears this (FT-001).
+        || blob.contains("structured output validation failed")
+        || blob.contains("structured output requested but none produced")
+        || blob.contains("output does not match the required schema")
+}
+
+/// A turn that succeeded at the transport level but did NOT deliver the
+/// schema-constrained output the caller demanded.
+///
+/// These never surface as an `acp::Error`: `handle_request` receives
+/// `Ok(Ok(PromptTurnOk))` and only later folds `structured_output` into a
+/// `success: false` result. Without this check the FT-001 strings in
+/// [`is_fallback_worthy_prompt_error`] could never fire for the verifier path,
+/// which is the exact case that motivated the fallback.
+///
+/// `wanted_schema` is the caller's `output_schema.is_some()`; when no schema
+/// was requested a missing structured output is normal and never a failure.
+fn is_structured_output_failure(outcome: &SubagentWaitOutcome, wanted_schema: bool) -> bool {
+    if !wanted_schema {
+        return false;
+    }
+    matches!(
+        outcome,
+        SubagentWaitOutcome::TurnResult(result)
+            if matches!(
+                result.as_ref(),
+                Ok(Ok(crate::session::commands::PromptTurnOk { structured_output, .. }))
+                    if !matches!(structured_output, Some(Ok(_)))
+            )
+    )
 }
 
 fn is_rate_limited_wait_outcome(outcome: &SubagentWaitOutcome) -> bool {
