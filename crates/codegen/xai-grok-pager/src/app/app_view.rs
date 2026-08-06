@@ -2489,11 +2489,12 @@ impl AppView {
         }
         let zdr_blocked = self.is_zdr_blocked();
         let has_access = self.has_access();
-        let welcome_pinned_upgrade_cta = crate::views::announcements::promo_cta(
-            &self.active_announcements,
-            &self.hidden_announcement_ids,
-        )
-        .is_some_and(|(owner, _, _)| !crate::views::announcements::is_dismissible(owner));
+        let welcome_pinned_upgrade_cta = self.pending_update_version.is_some()
+            || crate::views::announcements::promo_cta(
+                &self.active_announcements,
+                &self.hidden_announcement_ids,
+            )
+            .is_some_and(|(owner, _, _)| !crate::views::announcements::is_dismissible(owner));
         let has_foreign_resume = self.foreign_resume_hint().is_some();
         let sp_loading = crate::views::session_picker::loading_spinner_active(
             self.session_picker_entries.as_deref(),
@@ -4515,10 +4516,16 @@ impl AppView {
                             Some(eff) => format!("{model_name_base} ({eff})"),
                             None => model_name_base,
                         };
-                        let hero_cta = crate::views::announcements::promo_cta(
-                            &self.active_announcements,
-                            &self.hidden_announcement_ids,
-                        );
+                        let hero_cta = self
+                            .pending_update_version
+                            .is_none()
+                            .then(|| {
+                                crate::views::announcements::promo_cta(
+                                    &self.active_announcements,
+                                    &self.hidden_announcement_ids,
+                                )
+                            })
+                            .flatten();
                         let hero_announcement = hero_cta
                             .map(|(owner, _, _)| owner)
                             .or_else(|| {
@@ -4588,7 +4595,11 @@ impl AppView {
                             changelog_bullets: &self.changelog_bullets,
                             changelog_has_full_notes: self.changelog_markdown.is_some(),
                             welcome_announcement_expanded: self.welcome_announcement.expanded,
-                            upgrade_cta: hero_cta.map(|(_owner, label, _)| label),
+                            upgrade_cta: self
+                                .pending_update_version
+                                .is_some()
+                                .then_some("Click here to upgrade")
+                                .or_else(|| hero_cta.map(|(_owner, label, _)| label)),
                             privacy_banner,
                             #[cfg(feature = "local-workspace")]
                             workspace_mode: self.welcome_workspace_mode,
@@ -4921,17 +4932,27 @@ impl AppView {
                                 } else {
                                     &self.dashboard_local_sessions
                                 };
-                            let dash_upgrade_cta = crate::views::announcements::promo_cta(
-                                &self.active_announcements,
-                                &self.hidden_announcement_ids,
-                            )
-                            .map(
-                                |(owner, label, _)| crate::views::dashboard::HeaderUpgradeCta {
-                                    label,
-                                    pinned: !crate::views::announcements::is_dismissible(owner),
-                                    caption: crate::views::announcements::usable_cta_caption(owner),
-                                },
-                            );
+                            let dash_upgrade_cta = if self.pending_update_version.is_some() {
+                                Some(crate::views::dashboard::HeaderUpgradeCta {
+                                    label: "Click here to upgrade",
+                                    pinned: true,
+                                    caption: Some("Fork update ready"),
+                                })
+                            } else {
+                                crate::views::announcements::promo_cta(
+                                    &self.active_announcements,
+                                    &self.hidden_announcement_ids,
+                                )
+                                .map(|(owner, label, _)| {
+                                    crate::views::dashboard::HeaderUpgradeCta {
+                                        label,
+                                        pinned: !crate::views::announcements::is_dismissible(owner),
+                                        caption: crate::views::announcements::usable_cta_caption(
+                                            owner,
+                                        ),
+                                    }
+                                })
+                            };
                             let dash_cursor = crate::views::dashboard::render_dashboard(
                                 f.buffer_mut(),
                                 view_area,
