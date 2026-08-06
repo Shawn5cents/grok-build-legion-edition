@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# dag-inspector — exec wrapper. Resolves the package root and runs the CLI.
+set -e
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+export PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/env python3 -m dag_inspector "$@"
