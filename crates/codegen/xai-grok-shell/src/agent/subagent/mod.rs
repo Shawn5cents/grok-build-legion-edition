@@ -28,7 +28,8 @@ use crate::upload::turn::{PromptTraceContext, complete_prompt_trace};
 use agent_client_protocol as acp;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 use xai_acp_lib::AcpAgentGatewaySender as GatewaySender;
@@ -1747,6 +1748,90 @@ fn is_fallback_worthy_prompt_error(error: &acp::Error) -> bool {
         || blob.contains("structured output validation failed")
         || blob.contains("structured output requested but none produced")
         || blob.contains("output does not match the required schema")
+}
+
+// ---------------------------------------------------------------------------
+// FT-007 — cross-spawn sticky fallback cache
+//
+// The one-shot fallback in `handle_request` only lives for a single child
+// session: the next spawn of the same role starts on the primary model again
+// and re-hits the same wall (the MIXED rebuild loop). This process-global cache
+// remembers "role X already burned its primary" for a bounded TTL so the NEXT
+// spawn of that role starts directly on the configured fallback.
+// ---------------------------------------------------------------------------
+
+/// How long a sticky fallback decision survives. Long enough to cover a repair
+/// loop, short enough that a transient provider outage self-heals.
+const STICKY_FALLBACK_TTL: Duration = Duration::from_secs(20 * 60);
+
+#[derive(Debug, Clone)]
+struct StickyFallbackEntry {
+    fallback_model_id: String,
+    set_at: Instant,
+    #[allow(dead_code)]
+    reason: String,
+}
+
+fn sticky_fallback_cache() -> &'static Mutex<HashMap<String, StickyFallbackEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, StickyFallbackEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Sticky fallback model for a role, if one is set and not expired.
+/// Key = `subagent_type` (e.g. `"verifier"`).
+pub(crate) fn sticky_fallback_get(subagent_type: &str) -> Option<String> {
+    let mut guard = sticky_fallback_cache().lock().ok()?;
+    let expired = match guard.get(subagent_type) {
+        Some(entry) if entry.set_at.elapsed() > STICKY_FALLBACK_TTL => true,
+        Some(entry) => return Some(entry.fallback_model_id.clone()),
+        None => return None,
+    };
+    if expired {
+        guard.remove(subagent_type);
+    }
+    None
+}
+
+/// Remember that `subagent_type` should start on `fallback_model_id` for the
+/// next spawns within [`STICKY_FALLBACK_TTL`].
+pub(crate) fn sticky_fallback_set(subagent_type: &str, fallback_model_id: &str, reason: &str) {
+    if let Ok(mut guard) = sticky_fallback_cache().lock() {
+        let previous = guard.insert(
+            subagent_type.to_string(),
+            StickyFallbackEntry {
+                fallback_model_id: fallback_model_id.to_string(),
+                set_at: Instant::now(),
+                reason: reason.to_string(),
+            },
+        );
+        if previous
+            .as_ref()
+            .is_none_or(|p| p.fallback_model_id != fallback_model_id)
+        {
+            tracing::warn!(
+                subagent_type,
+                fallback_model = %fallback_model_id,
+                reason,
+                "FT-007 sticky fallback SET — next spawn of this role starts on fallback"
+            );
+        }
+    }
+}
+
+/// Forget the sticky fallback for a role so the primary is re-probed.
+pub(crate) fn sticky_fallback_clear(subagent_type: &str, why: &str) {
+    if let Ok(mut guard) = sticky_fallback_cache().lock()
+        && guard.remove(subagent_type).is_some()
+    {
+        tracing::info!(subagent_type, why, "FT-007 sticky fallback CLEAR");
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn sticky_fallback_clear_all() {
+    if let Ok(mut guard) = sticky_fallback_cache().lock() {
+        guard.clear();
+    }
 }
 
 /// A turn that succeeded at the transport level but did NOT deliver the

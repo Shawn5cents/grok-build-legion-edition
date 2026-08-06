@@ -21,6 +21,76 @@ fn fallback_classifier_accepts_only_typed_rate_limit_errors() {
     assert!(!is_rate_limited_prompt_error(&server_error));
 }
 #[test]
+fn fallback_worthy_includes_schema_and_serialization_errors() {
+    let e = acp::Error::new(-32000, "API error: response_format type is unavailable now");
+    assert!(is_fallback_worthy_prompt_error(&e));
+    let e2 = acp::Error::new(-32000, "serialization error: missing field `created`");
+    assert!(is_fallback_worthy_prompt_error(&e2));
+    let e3 = acp::Error::new(
+        -32000,
+        "structured output validation failed: [] is not of type object",
+    );
+    assert!(is_fallback_worthy_prompt_error(&e3));
+    let e4 = acp::Error::new(-32000, "structured output requested but none produced");
+    assert!(is_fallback_worthy_prompt_error(&e4));
+    let e5 = acp::Error::new(-32000, "server exploded");
+    assert!(!is_fallback_worthy_prompt_error(&e5));
+}
+// FT-007 — sticky fallback cache. Process-global: use unique role keys per
+// test and NEVER call clear_all from concurrent tests (race).
+#[test]
+fn sticky_fallback_set_get_clear() {
+    let role = "sticky-test-verifier-sgc";
+    sticky_fallback_clear(role, "test setup");
+    assert!(sticky_fallback_get(role).is_none());
+    sticky_fallback_set(role, "deepseek-v4-flash", "test");
+    assert_eq!(
+        sticky_fallback_get(role).as_deref(),
+        Some("deepseek-v4-flash")
+    );
+    // Re-setting overwrites the remembered model.
+    sticky_fallback_set(role, "qwen3-flash", "test overwrite");
+    assert_eq!(sticky_fallback_get(role).as_deref(), Some("qwen3-flash"));
+    sticky_fallback_clear(role, "test");
+    assert!(sticky_fallback_get(role).is_none());
+}
+#[test]
+fn sticky_fallback_is_scoped_per_role() {
+    let role_a = "sticky-test-implementor-scope";
+    let role_b = "sticky-test-architect-scope";
+    sticky_fallback_clear(role_a, "setup");
+    sticky_fallback_clear(role_b, "setup");
+    sticky_fallback_set(role_a, "claude-opus-5", "test");
+    assert!(sticky_fallback_get(role_b).is_none());
+    assert_eq!(
+        sticky_fallback_get(role_a).as_deref(),
+        Some("claude-opus-5")
+    );
+    sticky_fallback_clear(role_a, "test");
+    assert!(sticky_fallback_get(role_a).is_none());
+}
+#[test]
+fn sticky_fallback_fresh_entry_within_ttl() {
+    let role = "sticky-test-explore-ttl";
+    sticky_fallback_clear(role, "setup");
+    sticky_fallback_set(role, "deepseek-v4-flash", "test");
+    // Entries live for STICKY_FALLBACK_TTL; a fresh entry must not be expired.
+    assert!(STICKY_FALLBACK_TTL >= std::time::Duration::from_secs(60));
+    assert_eq!(
+        sticky_fallback_get(role).as_deref(),
+        Some("deepseek-v4-flash")
+    );
+    sticky_fallback_clear(role, "test");
+}
+#[test]
+fn sticky_fallback_clear_all_empties_cache() {
+    // Serial-only semantics: unique keys, then clear_all, then assert those keys gone.
+    let role = "sticky-test-clear-all-only";
+    sticky_fallback_set(role, "deepseek-v4-flash", "test");
+    sticky_fallback_clear_all();
+    assert!(sticky_fallback_get(role).is_none());
+}
+#[test]
 fn canonical_total_tokens_does_not_double_count_reasoning() {
     let totals = xai_chat_state::UsageTotals {
         input_tokens: 100,

@@ -8,13 +8,15 @@
 #   dag list
 #
 # After switching: RESTART the Grok TUI from a fresh terminal (config binds at session start).
-# Active label is written to ~/.grok/dag-mode (plain text: full|economy).
+# Active label is written to ~/.grok/dag-mode (plain text: full|economy|mixed).
+# Last switch timestamp is written to ~/.grok/dag-mode-switched-at (FT-006).
 
 set -euo pipefail
 
 PRESET_DIR="${GROK_PRESET_DIR:-$HOME/.grok/config-presets}"
 CONFIG="${GROK_CONFIG:-$HOME/.grok/config.toml}"
 MODE_FILE="${GROK_DAG_MODE:-$HOME/.grok/dag-mode}"
+SWITCHED_AT_FILE="${GROK_DAG_SWITCHED_AT:-$HOME/.grok/dag-mode-switched-at}"
 BACKUP_DIR="${GROK_CONFIG_BACKUP_DIR:-$HOME/.grok}"
 
 die() { echo "dag: error: $*" >&2; exit 1; }
@@ -44,6 +46,38 @@ preset_path() {
   esac
 }
 
+print_restart_banner() {
+  local mode="${1:-unknown}"
+  echo
+  echo "╔══════════════════════════════════════════════════════════╗"
+  echo "║  RESTART REQUIRED — config binds at TUI session start    ║"
+  printf "║  Disk now: %-10s | Live session: STILL OLD until     ║\n" "$mode"
+  echo "║  restart                                                 ║"
+  echo "║  1. Quit grok fully (Cmd+Q / /quit)                      ║"
+  echo "║  2. Open a fresh terminal                                ║"
+  echo "║  3. Run: grok                                            ║"
+  echo "║  Until then: dag-summary/disk can say MIXED while spawns ║"
+  echo "║  still use the previous preset's models. (FT-006)        ║"
+  echo "╚══════════════════════════════════════════════════════════╝"
+  echo
+}
+
+print_bind_warning() {
+  echo "WARNING: Config binds at TUI session start only."
+  echo "  If the TUI was launched before the last \`dag\` switch, live"
+  echo "  subagent routing may still be the PREVIOUS preset."
+  echo "  Restart grok after every switch. Disk label can lie until then."
+  if [[ -f "$SWITCHED_AT_FILE" ]]; then
+    local switched_mode switched_at
+    switched_mode="$(sed -n '1p' "$SWITCHED_AT_FILE" | tr -d '[:space:]')"
+    switched_at="$(sed -n '2p' "$SWITCHED_AT_FILE" | tr -d '[:space:]')"
+    if [[ -n "$switched_mode" || -n "$switched_at" ]]; then
+      echo "Last disk switch : ${switched_mode:-?} at ${switched_at:-?}"
+      echo "  → Restart TUI if the running session is older than this switch."
+    fi
+  fi
+}
+
 show_status() {
   local mode="(unknown)"
   if [[ -f "$MODE_FILE" ]]; then
@@ -57,6 +91,8 @@ show_status() {
   echo "Mode file        : $MODE_FILE"
   echo "Config           : $CONFIG"
   echo "[models] default : ${def:-?}"
+  echo
+  print_bind_warning
   echo
   case "$mode" in
     full)
@@ -103,12 +139,13 @@ dag — switch Grok Build DAG presets (FULL | MIXED | ECONOMY)
 
   dag full       Flagship multi-vendor DAG (expensive, most capable)
   dag economy    DeepSeek-primary DAG (cheap daily driver)
-  dag mixed     Multi-family economy DAG (cross-family verification)
+  dag mixed      Multi-family economy DAG (cross-family verification)
   dag status     Show which label is active
   dag list       List presets / aliases
 
 After every switch you MUST restart the Grok TUI.
 Config binds at session start — chat alone cannot change models mid-session.
+Disk label (~/.grok/dag-mode) can lie about live routing until restart (FT-006).
 
 Examples:
   dag economy && echo "now restart grok"
@@ -139,19 +176,19 @@ apply_mode() {
   fi
 
   printf '%s\n' "$mode" >"$MODE_FILE"
+  # FT-006: durable switch stamp so `dag status` can warn about stale sessions
+  {
+    printf '%s\n' "$mode"
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+  } >"$SWITCHED_AT_FILE"
 
   info "switched → ${mode}"
   info "preset    $src"
   info "wrote     $CONFIG"
   info "backup    $bak"
   info "label     $MODE_FILE  (= $mode)"
-  echo
-  echo "╔══════════════════════════════════════════════════════════╗"
-  echo "║  RESTART THE GROK TUI NOW                                ║"
-  echo "║  Quit fully, open a fresh terminal, run:  grok           ║"
-  echo "║  (Config + API keys bind at session start only.)         ║"
-  echo "╚══════════════════════════════════════════════════════════╝"
-  echo
+  info "switched  $SWITCHED_AT_FILE"
+  print_restart_banner "$mode"
   show_status
 }
 

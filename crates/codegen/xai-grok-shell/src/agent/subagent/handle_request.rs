@@ -497,6 +497,31 @@ pub(crate) async fn run_shell_child(
             return child_run_output(failure_result(&request, &msg), completion_data, None);
         }
     }
+    // FT-007: a previous spawn of this role already burned its primary model
+    // (fallback-worthy hard fail). Start this spawn directly on the sticky
+    // fallback instead of re-hitting the same wall. Skipped for resumed
+    // children (pinned to the source model) and forked children (pinned to the
+    // parent model) — those pins are stronger than the sticky hint.
+    let mut used_sticky_or_fallback = false;
+    if resume_source.is_none()
+        && !request.fork_context
+        && let Some(sticky_model) = super::sticky_fallback_get(&request.subagent_type)
+        && sticky_model != effective_model_id.0.as_ref()
+        && let Some((sticky_config, sticky_model_id)) =
+            resolve_model_override_to_config(&sticky_model, &ctx)
+        && sticky_model_id != effective_model_id
+    {
+        tracing::warn!(
+            subagent_id = %request.id,
+            subagent_type = %request.subagent_type,
+            was_model = %effective_model_id.0,
+            sticky_model = %sticky_model_id.0,
+            "FT-007 sticky fallback HIT — starting spawn on fallback model"
+        );
+        effective_sampling_config = sticky_config;
+        effective_model_id = sticky_model_id;
+        used_sticky_or_fallback = true;
+    }
     if let Some(raw) = effective_runtime.reasoning_effort.as_deref()
         && ctx
             .models_manager
@@ -1280,6 +1305,14 @@ pub(crate) async fn run_shell_child(
             .get(&request.subagent_type)
             .map(String::as_str)
     {
+        // FT-007: remember the burned primary as soon as we know it failed in a
+        // fallback-worthy way — even if the in-session switch below never
+        // lands, the NEXT spawn of this role should skip the doomed primary.
+        super::sticky_fallback_set(
+            &request.subagent_type,
+            fallback_model,
+            "primary fallback-worthy fail",
+        );
         match resolve_model_override_to_config(fallback_model, &ctx) {
             Some((fallback_sampling_config, fallback_model_id))
                 if fallback_model_id != effective_model_id =>
@@ -1313,6 +1346,14 @@ pub(crate) async fn run_shell_child(
                     false
                 };
                 if switched {
+                    // FT-007: pin the sticky entry to the model we actually
+                    // switched to (canonical id), so the next spawn starts here.
+                    super::sticky_fallback_set(
+                        &request.subagent_type,
+                        fallback_model_id.0.as_ref(),
+                        "one-shot in-session fallback after primary fallback-worthy fail",
+                    );
+                    used_sticky_or_fallback = true;
                     subagent_meta.effective_model_id = Some(fallback_model_id.0.to_string());
                     write_subagent_meta(&subagent_meta_dir, &subagent_meta);
                     gcs_upload_ctx.model_id = Some(fallback_model_id.0.to_string());
@@ -1579,6 +1620,13 @@ pub(crate) async fn run_shell_child(
             }
         }
     };
+    // FT-007 clear policy (anti-loop): only a clean run on the PRIMARY model
+    // clears the sticky entry. A success that only happened because we started
+    // on (or switched to) the fallback keeps the entry alive until its TTL, so
+    // the next spawn of this role does not walk back into the doomed primary.
+    if result.success && !used_sticky_or_fallback {
+        super::sticky_fallback_clear(&request.subagent_type, "spawn succeeded on primary model");
+    }
     if let Some(trace_gcs_config) = gcs_upload_ctx.upload_method.as_ref().map(|method| {
         crate::session::repo_changes::TraceExportConfig {
             bucket_url: gcs_upload_ctx.bucket_url.clone(),
