@@ -66,10 +66,12 @@ dag-switch.sh         ← Shell: copies preset to config.toml, writes dag-mode l
 | Explore | `deepseek-v4-flash` |
 | Plan / Implementor | `claude-opus-5` |
 | Architect | `gpt-5.6-sol` |
-| Verifier | `deepseek-v4-pro` |
+| Verifier | `grok-4.5` (fallback: `deepseek-v4-pro`) |
 | General-purpose | `deepseek-v4-pro` |
 
 **Cost**: HIGH. Use for complex multi-file work, hard bugs, or when economy is stuck.
+
+**Note (v0.2.120):** FULL verifier primary is `grok-4.5` (schema-safe). See `docs/v0.2.120.md`.
 
 **Requires**: `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`.
 
