@@ -1717,11 +1717,38 @@ enum SubagentWaitOutcome {
 fn is_rate_limited_prompt_error(error: &acp::Error) -> bool {
     i32::from(error.code) == crate::sampling::error::RATE_LIMITED_ERROR_CODE
 }
+
+/// True when the primary model hard-failed in a way that another family is
+/// likely to clear — currently rate limits AND provider schema rejections
+/// (DeepSeek 400: "This response_format type is unavailable now" when the
+/// verifier injects a JSON schema). Fallback is one-shot; see handle_request.
+fn is_fallback_worthy_prompt_error(error: &acp::Error) -> bool {
+    if is_rate_limited_prompt_error(error) {
+        return true;
+    }
+    let message = error.message.to_ascii_lowercase();
+    let data = error
+        .data
+        .as_ref()
+        .map(|d| d.to_string())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let blob = format!("{message}\n{data}");
+    // DeepSeek / OpenRouter reject native json_schema response_format.
+    blob.contains("response_format type is unavailable")
+        || blob.contains("response_format") && blob.contains("unavailable")
+        || blob.contains("invalid_request_error")
+            && (blob.contains("response_format") || blob.contains("json_schema"))
+        // MiniMax intermittent serialization aborts on the primary path.
+        || blob.contains("serialization error") && blob.contains("missing field")
+}
+
 fn is_rate_limited_wait_outcome(outcome: &SubagentWaitOutcome) -> bool {
+    // Name kept for call-site stability; now covers all fallback-worthy errors.
     matches!(
         outcome,
         SubagentWaitOutcome::TurnResult(result)
-            if matches!(result.as_ref(), Ok(Err(error)) if is_rate_limited_prompt_error(error))
+            if matches!(result.as_ref(), Ok(Err(error)) if is_fallback_worthy_prompt_error(error))
     )
 }
 async fn await_subagent_turn_or_cancellation(

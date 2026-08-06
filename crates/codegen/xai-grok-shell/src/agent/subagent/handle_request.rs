@@ -1285,7 +1285,9 @@ pub(crate) async fn run_shell_child(
                     subagent_type = %request.subagent_type,
                     primary_model = %effective_model_id.0,
                     fallback_model = %fallback_model_id.0,
-                    "Primary subagent model exhausted its rate-limit retries; switching once to configured fallback"
+                    "Primary subagent model failed with a fallback-worthy error \
+                     (rate limit / unsupported response_format / serialization); \
+                     switching once to configured fallback"
                 );
                 let fallback_threshold =
                     ctx.resolve_auto_compact_threshold_percent(fallback_model_id.0.as_ref());
@@ -1314,8 +1316,10 @@ pub(crate) async fn run_shell_child(
                     turn_started_at = chrono::Utc::now().to_rfc3339();
                     let (fallback_prompt_tx, fallback_prompt_rx) = oneshot::channel();
                     let retry_prompt = format!(
-                        "The primary model was rate limited before completing this turn. \
-                         Continue the original task now using the existing conversation context. \
+                        "The primary model failed before completing this turn \
+                         (rate limit, unsupported structured-output format, or \
+                         a provider serialization error). Continue the original \
+                         task now using the existing conversation context. \
                          Do not restart completed work.\n\nOriginal task:\n{prompt}",
                     );
                     let _ = child_handle.cmd_tx.send(SessionCommand::Prompt {
