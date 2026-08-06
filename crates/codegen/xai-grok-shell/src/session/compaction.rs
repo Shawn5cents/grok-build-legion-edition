@@ -2259,6 +2259,7 @@ mod inline_auto_compact_flow_tests {
         let chat_state_handle = xai_chat_state::ChatStateActor::spawn(
             vec![],
             xai_grok_sampling_types::SamplingConfig {
+                supports_structured_output: true,
                 base_url: "http://localhost".to_string(),
                 model: "test".to_string(),
                 max_completion_tokens: None,
@@ -2279,6 +2280,7 @@ mod inline_auto_compact_flow_tests {
         );
         chat_state_handle.record_token_usage(total_tokens);
         SessionActor {
+            supports_structured_output: std::cell::Cell::new(true),
             unattributed_background_usage: std::sync::atomic::AtomicBool::new(false),
             session_info: SessionInfo {
                 id: acp::SessionId::new("test-auto-compact"),

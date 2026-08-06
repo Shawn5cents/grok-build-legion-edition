@@ -55,6 +55,7 @@ fn persist_ack_waits_for_disk_flush_before_success() {
                         };
                         let sampling_client =
                             crate::sampling::Client::new(xai_grok_sampler::SamplerConfig {
+                                supports_structured_output: true,
                                 api_key: Some("test-key".to_string()),
                                 base_url: "http://localhost".to_string(),
                                 model: "test".to_string(),
@@ -108,6 +109,7 @@ fn persist_ack_waits_for_disk_flush_before_success() {
                         let chat_state_handle = xai_chat_state::ChatStateActor::spawn(
                             vec![],
                             xai_grok_sampling_types::SamplingConfig {
+                                supports_structured_output: true,
                                 base_url: "http://localhost".to_string(),
                                 model: "test".to_string(),
                                 max_completion_tokens: None,
@@ -130,6 +132,7 @@ fn persist_ack_waits_for_disk_flush_before_success() {
                             tokio_util::sync::CancellationToken::new(),
                         );
                         let actor = Arc::new(SessionActor {
+                            supports_structured_output: std::cell::Cell::new(true),
                             session_info,
                             auth_method_id: test_auth_method_id("test-auth"),
                             model_auth_memo: std::cell::RefCell::new(None),
@@ -406,6 +409,7 @@ async fn first_turn_memory_injection_persists_to_chat_history() {
                 cwd: session_dir.path().to_string_lossy().to_string(),
             };
             let sampling_client = crate::sampling::Client::new(xai_grok_sampler::SamplerConfig {
+                    supports_structured_output: true,
                     api_key: Some("test-key".to_string()),
                     base_url: "http://localhost".to_string(),
                     model: "test-model".to_string(),
@@ -459,6 +463,7 @@ async fn first_turn_memory_injection_persists_to_chat_history() {
                         ConversationItem::user("<user_info>OS Version: macos</user_info>"),
                     ],
                 xai_grok_sampling_types::SamplingConfig {
+                    supports_structured_output: true,
                     base_url: "http://localhost".to_string(),
                     model: "test".to_string(),
                     max_completion_tokens: None,
@@ -540,6 +545,7 @@ async fn first_turn_memory_injection_disabled_does_not_persist_to_chat_history()
             let tool_context =
                 ToolContext::new(cwd.clone(), None, None, fs, terminal, hunk_tracker_handle);
             let sampling_client = crate::sampling::Client::new(xai_grok_sampler::SamplerConfig {
+                supports_structured_output: true,
                 api_key: Some("test-key".to_string()),
                 base_url: "http://localhost".to_string(),
                 model: "test-model".to_string(),
@@ -595,6 +601,7 @@ async fn first_turn_memory_injection_disabled_does_not_persist_to_chat_history()
             let chat_state_handle = xai_chat_state::ChatStateActor::spawn(
                 initial_conversation.clone(),
                 xai_grok_sampling_types::SamplingConfig {
+                    supports_structured_output: true,
                     base_url: "http://localhost".to_string(),
                     model: "test".to_string(),
                     max_completion_tokens: None,
@@ -633,6 +640,7 @@ async fn first_turn_memory_injection_disabled_does_not_persist_to_chat_history()
             };
             let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel::<SessionEvent>();
             let actor = Arc::new(SessionActor {
+                supports_structured_output: std::cell::Cell::new(true),
                 session_info: session_info.clone(),
                 auth_method_id: test_auth_method_id("test-auth"),
                 model_auth_memo: std::cell::RefCell::new(None),
@@ -912,6 +920,7 @@ async fn cancel_running_task_teardown_clears_running_and_pending_work() {
                 )
                 .await;
             let actor = SessionActor {
+                supports_structured_output: std::cell::Cell::new(true),
                 session_info: SessionInfo {
                     id: acp::SessionId::new("test-cancel"),
                     cwd: cwd.as_str().to_string(),
@@ -2080,6 +2089,7 @@ async fn cancel_propagates_to_sampler_handle_so_no_further_emission() {
                 let _ = axum::serve(listener, app).await;
             });
             let cfg = xai_grok_sampler::SamplerConfig {
+                supports_structured_output: true,
                 api_key: Some("test-key".to_string()),
                 base_url: format!("http://{addr}/v1"),
                 model: "test-model".to_string(),
@@ -2167,6 +2177,7 @@ async fn cancel_propagates_to_sampler_handle_so_no_further_emission() {
                 )
                 .await;
             let actor = SessionActor {
+                supports_structured_output: std::cell::Cell::new(true),
                 session_info: SessionInfo {
                     id: acp::SessionId::new("test-cancel-sampler"),
                     cwd: cwd.as_str().to_string(),

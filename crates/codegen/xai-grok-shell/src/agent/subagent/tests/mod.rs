@@ -1829,6 +1829,7 @@ async fn cancel_pending_at_promote_removes_fresh_worktree_preserves_resumed() {
 fn test_model_entry(model_id: &str) -> crate::agent::config::ModelEntry {
     crate::agent::config::ModelEntry {
         info: crate::agent::config::ModelInfo {
+            supports_structured_output: true,
             user_selectable: true,
             id: None,
             model: model_id.to_string(),
@@ -2132,6 +2133,7 @@ fn normalize_forked_context_short_conversation() {
 fn test_sampling_config(model_slug: &str) -> xai_grok_sampling_types::SamplingConfig {
     use std::num::NonZeroU64;
     xai_grok_sampling_types::SamplingConfig {
+        supports_structured_output: true,
         base_url: "https://api.test/v1".to_string(),
         model: model_slug.to_string(),
         max_completion_tokens: None,

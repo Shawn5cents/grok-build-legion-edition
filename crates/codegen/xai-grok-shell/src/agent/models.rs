@@ -3371,6 +3371,7 @@ mod tests {
         name: Option<&str>,
     ) -> config::ModelEntryConfig {
         config::ModelEntryConfig {
+            supports_structured_output: true,
             id: id.map(|s| s.to_owned()),
             model: model.to_owned(),
             base_url: "https://test.api/v1".to_owned(),

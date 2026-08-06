@@ -2191,6 +2191,7 @@ mod eligibility_gates {
 fn find_model_by_id_prefers_key_then_falls_back_to_slug() {
     let entry = |model: &str| ModelEntry {
         info: config::ModelInfo {
+            supports_structured_output: true,
             user_selectable: true,
             id: None,
             model: model.to_string(),

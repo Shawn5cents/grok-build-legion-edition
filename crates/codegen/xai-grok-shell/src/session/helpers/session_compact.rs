@@ -1627,6 +1627,7 @@ mod reasoning_compaction_regression_tests {
     }
     fn test_config(base_url: &str) -> SamplerConfig {
         SamplerConfig {
+            supports_structured_output: true,
             api_key: Some("test-api-key".to_string()),
             base_url: base_url.to_string(),
             model: "test-model".to_string(),

@@ -213,6 +213,7 @@ pub(crate) async fn create_test_actor_ex(
     let chat_state_handle = xai_chat_state::ChatStateActor::spawn(
         vec![],
         xai_grok_sampling_types::SamplingConfig {
+            supports_structured_output: true,
             base_url: "http://localhost".to_string(),
             model: "test".to_string(),
             max_completion_tokens: None,
@@ -233,6 +234,7 @@ pub(crate) async fn create_test_actor_ex(
     );
     chat_state_handle.record_token_usage(total_tokens);
     let actor = SessionActor {
+        supports_structured_output: std::cell::Cell::new(true),
         session_info: SessionInfo {
             id: acp::SessionId::new("test-actor"),
             cwd: cwd.as_str().to_string(),
