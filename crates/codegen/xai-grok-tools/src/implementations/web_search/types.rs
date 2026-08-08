@@ -6,6 +6,8 @@ use indexmap::IndexMap;
 /// Use `Enabled { … }` to provide credentials and endpoint configuration.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
+// Boxing `Enabled` fields would break the public construction/match API.
+#[allow(clippy::large_enum_variant)]
 pub enum WebSearchConfig {
     #[default]
     Disabled,

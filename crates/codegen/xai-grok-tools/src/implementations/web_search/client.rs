@@ -217,18 +217,18 @@ impl WebSearchClient {
             "type": "web_search",
             "web_search": {}
         }]);
-        if let Some(ref domains) = allowed_domains {
-            if !domains.is_empty() {
-                tools = serde_json::json!([{
-                    "type": "web_search",
-                    "web_search": {
-                        "user_location": {
-                            "type": "approximate",
-                            "country": "US"
-                        }
+        if let Some(ref domains) = allowed_domains
+            && !domains.is_empty()
+        {
+            tools = serde_json::json!([{
+                "type": "web_search",
+                "web_search": {
+                    "user_location": {
+                        "type": "approximate",
+                        "country": "US"
                     }
-                }]);
-            }
+                }
+            }]);
         }
         let body = serde_json::json!({
             "model": self.model,
@@ -475,10 +475,10 @@ fn extract_citations_chat(response: &serde_json::Value) -> Vec<String> {
     let mut citations = Vec::new();
     if let Some(annotations) = response["choices"][0]["message"]["annotations"].as_array() {
         for annotation in annotations {
-            if annotation["type"].as_str() == Some("url_citation") {
-                if let Some(url) = annotation["url"].as_str() {
-                    citations.push(url.to_string());
-                }
+            if annotation["type"].as_str() == Some("url_citation")
+                && let Some(url) = annotation["url"].as_str()
+            {
+                citations.push(url.to_string());
             }
         }
     }
