@@ -2706,10 +2706,10 @@ mod tests {
             .to_string()
     }
 
-    /// The badge carries the product name, the version, and the channel, and never a release label.
-    /// The hero footer prints a channel only on alpha and beta builds, so on stable it must not end on a separator.
+    /// The badge carries the Legion product label in product-name variants.
+    /// The hero footer prints the build channel, so it must not end on a separator.
     #[test]
-    fn version_badge_carries_no_release_label() {
+    fn version_badge_carries_legion_label() {
         let full = badge_text(
             VersionBadgeMode::Full {
                 subscription_tier: None,
@@ -2719,14 +2719,16 @@ mod tests {
         let inline = badge_text(VersionBadgeMode::HeroInline, None);
         let footer = badge_text(VersionBadgeMode::HeroFooter, Some("acme"));
 
-        for rendered in [&full, &inline, &footer] {
-            assert!(
-                !rendered.contains("Beta"),
-                "badge must not label the product: {rendered:?}"
-            );
-        }
         assert!(full.contains("Grok Build"), "full badge: {full:?}");
         assert!(inline.contains("Grok Build"), "inline badge: {inline:?}");
+        assert!(
+            full.contains("Beta Legion Edition"),
+            "full badge keeps Legion branding: {full:?}"
+        );
+        assert!(
+            inline.contains("Beta Legion Edition"),
+            "inline badge keeps Legion branding: {inline:?}"
+        );
         assert!(footer.contains("acme"), "footer keeps the team: {footer:?}");
         assert!(
             !footer.ends_with('\u{2502}'),

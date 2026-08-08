@@ -1715,6 +1715,7 @@ mod tests {
         assert!(WORKTREE_NO_RESTORE_CODE_NOTICE.contains("--restore-code"));
     }
     /// `--restore-code` without `--worktree` must fail before any in-place checkout.
+    #[serial_test::serial(GROK_HOME)]
     #[tokio::test]
     async fn remote_miss_restore_code_without_worktree_errors() {
         let err = materialize_startup_for_cwd(
@@ -1749,6 +1750,7 @@ mod tests {
         );
     }
     /// `--restore-code --worktree` stays on the existing defer path.
+    #[serial_test::serial(GROK_HOME)]
     #[tokio::test]
     async fn remote_miss_restore_code_with_worktree_defers() {
         let id = "no such remote target";
@@ -1779,6 +1781,7 @@ mod tests {
             other => panic!("expected Resume, got {other:?}"),
         }
     }
+    #[serial_test::serial(GROK_HOME)]
     #[tokio::test]
     async fn remote_miss_worktree_without_restore_code_suppresses_snapshot() {
         let id = "no such remote target";
@@ -1926,7 +1929,7 @@ mod tests {
     #[tokio::test]
     async fn chat_resume_passthrough_keeps_cwd_collision_refusal() {
         let home = tempfile::tempdir().expect("home tempdir");
-        unsafe { std::env::set_var("GROK_HOME", home.path()) };
+        let _grok_home = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
         let cwd = tempfile::tempdir().expect("cwd tempdir");
         let cwd_str = cwd.path().to_string_lossy().to_string();
         let id = "aaaaaaaa-1111-2222-3333-444444444444";
