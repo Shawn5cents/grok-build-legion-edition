@@ -1028,9 +1028,21 @@ pub enum ApiBackend {
 }
 
 impl ApiBackend {
+    /// Whether the backend natively enforces a response JSON schema alongside
+    /// tool calls (`response_format: json_schema`). The Messages API does not
+    /// (a schema there blocks tool use), so structured output there goes
+    /// through the `StructuredOutput` tool. Not all ChatCompletions providers
+    /// support `json_schema` — e.g. DeepSeek's native API only supports
+    /// `json_object`, so it must also use the tool fallback.
+    pub fn native_json_schema_supported(&self, base_url: &str) -> bool {
+        matches!(self, Self::ChatCompletions | Self::Responses)
+            && !base_url.contains("api.deepseek.com")
+    }
+
     /// Whether the backend enforces a response JSON schema natively alongside
     /// tool calls. The Messages API does not (a schema there blocks tool use),
     /// so structured output there goes through the StructuredOutput tool.
+    #[deprecated(since = "TBD", note = "use `native_json_schema_supported`")]
     pub fn supports_native_schema(&self) -> bool {
         matches!(self, Self::ChatCompletions | Self::Responses)
     }
@@ -1642,5 +1654,29 @@ mod tests {
         let inner: &dyn TraceContext = &*cloned_trace;
         let downcast = inner.as_any().downcast_ref::<TestTrace>().unwrap();
         assert_eq!(downcast.0, "trace-data");
+    }
+
+    #[test]
+    fn native_json_schema_excludes_deepseek() {
+        assert!(
+            ApiBackend::ChatCompletions.native_json_schema_supported("https://api.openai.com/v1")
+        );
+        assert!(
+            !ApiBackend::ChatCompletions
+                .native_json_schema_supported("https://api.deepseek.com/v1")
+        );
+        assert!(
+            !ApiBackend::ChatCompletions.native_json_schema_supported("https://api.deepseek.com/")
+        );
+        // Messages backend always unsupported regardless of URL
+        assert!(!ApiBackend::Messages.native_json_schema_supported("https://api.openai.com/v1"));
+        assert!(!ApiBackend::Messages.native_json_schema_supported("https://api.deepseek.com/v1"));
+        // Responses backend should still work (OpenAI-native)
+        assert!(ApiBackend::Responses.native_json_schema_supported("https://api.openai.com/v1"));
+        // OpenRouter should pass (not a DeepSeek endpoint)
+        assert!(
+            ApiBackend::ChatCompletions
+                .native_json_schema_supported("https://openrouter.ai/api/v1")
+        );
     }
 }
