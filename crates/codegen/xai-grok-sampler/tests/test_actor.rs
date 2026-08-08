@@ -87,6 +87,7 @@ fn test_config(base_url: String, model: &str) -> SamplerConfig {
         max_retries: Some(2),
         stream_tool_calls: false,
         idle_timeout_secs: Some(30),
+        supports_structured_output: true,
         reasoning_effort: None,
         origin_client: None,
         client_identifier: None,

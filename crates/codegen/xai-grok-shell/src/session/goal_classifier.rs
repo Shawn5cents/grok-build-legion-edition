@@ -16,8 +16,8 @@ pub(crate) mod evidence;
 
 use crate::session::events::{Event, GoalClassifierFailOpenReason};
 use crate::session::goal_planner::{
-    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, RoleRenderedPrompt,
-    RoleSpawnOverride, spawn_with_fail_open_retry,
+    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, RoleRenderedPrompt, RoleSpawnOverride,
+    spawn_with_fail_open_retry,
 };
 use crate::session::goal_role_tools::RoleToolNames;
 use crate::session::goal_tracker::GoalClassifierVerdict;
@@ -2404,14 +2404,6 @@ async fn write_details_file(path: &Path, body: &str) {
 #[cfg(test)]
 pub(crate) fn parse_verdict_path_from_prompt(prompt: &str) -> Option<String> {
     parse_prompt_path(prompt, "goal-verdict-", ".json")
-}
-
-/// Pull the per-skeptic `{DETAILS_FILE}` path out of a rendered verifier
-/// prompt (anchor: the `-skeptic-` file-name marker). Shared by the
-/// classifier and strategist e2e suites.
-#[cfg(test)]
-pub(crate) fn parse_skeptic_details_path_from_prompt(prompt: &str) -> Option<String> {
-    parse_prompt_path(prompt, "-skeptic-", ".md")
 }
 
 /// Extract an absolute artifact path from a rendered prompt: the files

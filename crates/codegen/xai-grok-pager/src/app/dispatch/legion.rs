@@ -5,7 +5,7 @@
 //! remain heterogeneous and resolve independently when their subagents spawn.
 
 use crate::app::actions::Effect;
-use crate::app::agent::AgentId;
+use crate::app::agent::{AgentId, DeferredModelSwitch};
 use crate::app::agent_view::AgentView;
 use crate::app::app_view::AppView;
 use agent_client_protocol as acp;
@@ -60,8 +60,13 @@ pub(super) fn synchronize_orchestrator(app: &mut AppView, agent_id: AgentId) -> 
         return vec![];
     }
     let Some(session_id) = agent.session.session_id.clone() else {
+        let prev_model_id = agent.session.models.current.clone();
         agent.session.models.set_current(orchestrator.clone(), None);
-        agent.session.deferred_model_switch = Some((orchestrator, None));
+        agent.session.deferred_model_switch = Some(DeferredModelSwitch {
+            model_id: orchestrator,
+            effort: None,
+            prev_model_id,
+        });
         return vec![];
     };
     let prev_model_id = agent.session.models.current.clone();

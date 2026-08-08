@@ -3,7 +3,6 @@
 use super::ctx::with_active_agent;
 use super::legion;
 use super::queue::{maybe_drain_queue, note_peek_page_flip};
-use super::session::lifecycle::skip_picker_and_create_session;
 use super::settings::ui::{refresh_open_settings_modals, save_success_toast};
 use super::transcript::dispatch_open_config_agents_modal;
 use crate::app::actions::Effect;
@@ -790,7 +789,6 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 persist: crate::app::actions::PermissionModePersist::BestEffort,
             });
         }
-        effects.extend(skip_picker_and_create_session(app, id));
         if entered_legion {
             effects.extend(dispatch_open_config_agents_modal(
                 app,

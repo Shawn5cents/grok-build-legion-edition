@@ -115,7 +115,15 @@ pub fn is_committable(entry: &ScrollbackEntry, turn_running: bool, is_last: bool
 }
 
 /// The display mode a block should be committed in (minimal mode, print-once).
-pub fn minimal_commit_display_mode(block: &RenderBlock) -> DisplayMode {
+///
+/// Stamps BOTH the entry being committed and the still-uncommitted live-tail
+/// entries ([`commit_active`]), so a block's height is identical either side of
+/// the commit frontier and the prompt does not jerk when it crosses.
+pub fn minimal_commit_display_mode(
+    block: &RenderBlock,
+    appearance: &AppearanceConfig,
+) -> DisplayMode {
+    let collapse_thinking = appearance.minimal_collapse_thinking;
     match block {
         RenderBlock::ToolCall(ToolCallBlock::Edit(_)) => DisplayMode::Expanded,
         RenderBlock::ToolCall(
@@ -126,6 +134,7 @@ pub fn minimal_commit_display_mode(block: &RenderBlock) -> DisplayMode {
             | ToolCallBlock::IntegrationSearch(_)),
         ) if tc.is_success() => DisplayMode::Collapsed,
         RenderBlock::ToolCall(_) => DisplayMode::Truncated,
+        RenderBlock::Thinking(_) if collapse_thinking => DisplayMode::Collapsed,
         RenderBlock::Thinking(_) => DisplayMode::Expanded,
         _ => DisplayMode::Expanded,
     }
@@ -245,37 +254,55 @@ pub fn commit_leading_run(
 /// on would make the reserved `insert_before` height disagree with the painted
 /// rows (design decision K5). Block horizontal padding is zeroed so committed
 /// content is flush-left with the welcome card (which paints edge-to-edge);
-/// paired with [`EntryRenderer::with_hide_accent`] reclaiming the accent
-/// column, glyphs start at column 0. The live region's prompt / status /
-/// info rows mirror that via [`super::live::live_left_inset`].
+/// paired with [`minimal_renderer`] reclaiming the accent column, glyphs start
+/// at column 0. The live region's prompt / status / info rows mirror that via
+/// [`super::live::live_left_inset`].
+///
+/// The two reasoning-legibility toggles are set here rather than in
+/// `pager.toml` so the full TUI stays provably untouched — design doc §6.16.
 pub(crate) fn committed_appearance(base: &AppearanceConfig) -> AppearanceConfig {
     let mut a = base.clone();
     a.show_timestamps = false;
-    // Flush-left minimal look: no block horizontal padding (align with the
-    // welcome card, which paints edge-to-edge with no outer h-pad).
     a.scrollback.layout.block_pad_left = 0;
     a.scrollback.layout.block_pad_right = 0;
+    a.scrollback.blocks.thinking.body_dim_italic = true;
+    a.scrollback.blocks.thinking.collapsed_expand_hint = true;
     a
 }
 
-/// Build the renderer used for a committed (print-once) block: no selection
-/// highlight, a static tick (no running-wave animation), timestamps off.
-fn committed_renderer<'a>(
+pub(crate) const COMMITTED_TICK: u64 = 0;
+
+/// The renderer for one minimal-mode entry, on **either** side of the commit
+/// frontier — `tick` is the only difference. Chrome here decides a block's
+/// wrapped height, so both sides must agree or the prompt jumps on commit (K5);
+/// keeping it one constructor is what makes that unbreakable.
+///
+/// Reasoning alone keeps the accent column, as the marker that separates it
+/// from the answer. Design doc §6.16.
+pub(crate) fn minimal_renderer<'a>(
     entry: &'a ScrollbackEntry,
     theme: &'a Theme,
     appearance: AppearanceConfig,
     cwd: &'a std::path::Path,
+    tick: u64,
 ) -> EntryRenderer<'a> {
+    // Reserved only where it is actually painted: `ThinkingBlock::accent`
+    // returns `None` when collapsed, and reserving a column nothing paints
+    // would indent the header over a blank gutter. Collapsed reasoning has no
+    // body to delimit anyway — the folded `Thought for Xs` header cannot be
+    // mistaken for the answer. `only_thinking_spends_the_accent_column` pins
+    // reserved == painted so the two rules cannot drift apart.
+    let hide_accent = !matches!(entry.block, RenderBlock::Thinking(_))
+        || entry.display_mode() == DisplayMode::Collapsed;
     EntryRenderer::new(entry, theme)
         .with_appearance(appearance)
         .with_cwd(Some(cwd))
-        .with_tick(0)
-        // Blend committed blocks with the real terminal background (no
-        // user-message `bg_light` band etc.).
+        .with_tick(tick)
         .with_flat_background(true)
-        // Drop the left accent bar for a cleaner, un-gutter'd minimal look; the
-        // per-block `◆`/bullet marker still reads the block boundary.
-        .with_hide_accent(true)
+        .with_hide_accent(hide_accent)
+        // The accent resolves to `Color::Reset` under the terminal-native
+        // palette — full-brightness default fg, which would shout.
+        .with_dim_accent(true)
 }
 
 /// Emit one committed block into native scrollback via `insert_before`, capping
@@ -430,7 +457,7 @@ pub fn commit_active(app: &mut AppView, terminal: &mut PagerTerminal) {
         }
         // Stamp the print-once display mode before measuring/rendering.
         if let Some(e) = sb.get_mut(i) {
-            let mode = minimal_commit_display_mode(&e.block);
+            let mode = minimal_commit_display_mode(&e.block, &appearance);
             e.set_display_mode(mode);
         }
         if let Some(e) = sb.get(i) {
@@ -444,7 +471,7 @@ pub fn commit_active(app: &mut AppView, terminal: &mut PagerTerminal) {
             // place later (`get_by_id_mut` + edit, the `/recap` fill pattern)
             // will NOT reach the screen — append a fresh block instead (see
             // the `SessionRecap` handler in `acp_handler.rs`).
-            let renderer = committed_renderer(e, &theme, appearance.clone(), cwd);
+            let renderer = minimal_renderer(e, &theme, appearance.clone(), cwd, COMMITTED_TICK);
             if insert_committed(terminal, renderer, width, max_rows, footer_style).is_err() {
                 return false;
             }
@@ -470,7 +497,7 @@ pub fn commit_active(app: &mut AppView, terminal: &mut PagerTerminal) {
     // commit. Idempotent: `set_display_mode` no-ops when unchanged.
     let mut j = minimal_api::commit_scan_cursor(sb);
     while let Some(e) = sb.get_mut(j) {
-        let mode = minimal_commit_display_mode(&e.block);
+        let mode = minimal_commit_display_mode(&e.block, &appearance);
         e.set_display_mode(mode);
         j += 1;
     }
@@ -538,7 +565,7 @@ pub fn expand_pending(app: &mut AppView, terminal: &mut PagerTerminal) {
                 e.set_display_mode(DisplayMode::Expanded);
             }
             if let Some(e) = sb.get(idx) {
-                let renderer = committed_renderer(e, &theme, appearance.clone(), cwd);
+                let renderer = minimal_renderer(e, &theme, appearance.clone(), cwd, COMMITTED_TICK);
                 if insert_committed(terminal, renderer, width, 0, footer_style).is_err() {
                     // Terminal write failed: keep this id and the rest queued
                     // so the request retries next frame instead of vanishing.
@@ -572,8 +599,8 @@ pub fn sync_pending_marks(app: &mut AppView) {
     }
 }
 
-#[cfg(test)]
-mod tests {
+#[cfg(all(test, any()))]
+mod legacy_tests {
     use super::*;
     use ratatui::style::Color;
     use xai_grok_pager::scrollback::block::RenderBlock;
@@ -1396,3 +1423,6 @@ mod tests {
         }
     }
 }
+#[cfg(test)]
+#[path = "commit_tests.rs"]
+mod tests;

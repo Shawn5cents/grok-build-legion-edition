@@ -22,8 +22,8 @@
 
 use crate::session::events::{Event, GoalStrategistFailReason, GoalStrategistRestoreFailReason};
 use crate::session::goal_planner::{
-    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, RoleRenderedPrompt,
-    RoleSpawnOverride, SpawnError, parse_terminal_response, spawn_with_fail_open_retry,
+    GOAL_ROLE_AWAIT_BUDGET_EXCEEDED, RoleRenderedPrompt, RoleSpawnOverride, SpawnError,
+    parse_terminal_response, spawn_with_fail_open_retry,
 };
 use crate::session::goal_role_tools::RoleToolNames;
 use std::path::{Path, PathBuf};

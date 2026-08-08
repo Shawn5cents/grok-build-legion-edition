@@ -69,15 +69,16 @@ impl WebSearchClient {
             headers.insert(header_name, header_value);
         }
         let _ = alpha_test_key;
-        let http = reqwest::Client::builder()
-            .default_headers(headers)
-            .build()
-            .map_err(|e| {
-                xai_tool_runtime::ToolError::execution(
-                    xai_tool_protocol::ToolId::new("web_search").expect("valid"),
-                    format!("Failed to build HTTP client: {e}"),
-                )
-            })?;
+        let http = xai_grok_extra_ca::with_extra_root_certificates(
+            reqwest::Client::builder().default_headers(headers),
+        )
+        .build()
+        .map_err(|e| {
+            xai_tool_runtime::ToolError::execution(
+                xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+                format!("Failed to build HTTP client: {e}"),
+            )
+        })?;
         Ok(Self {
             http,
             base_url: base_url.clone(),
@@ -241,10 +242,7 @@ impl WebSearchClient {
             "max_completion_tokens": 8192,
             "stream": false
         });
-        let url = format!(
-            "{}/chat/completions",
-            self.base_url.trim_end_matches('/')
-        );
+        let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
         let sent_bearer = self.current_bearer().await;
         let auth_key = sent_bearer.as_deref().unwrap_or(&self.api_key);
         let response = self
@@ -319,9 +317,12 @@ impl WebSearchClient {
         allowed_domains: Option<Vec<String>>,
     ) -> Result<(String, Vec<(String, String)>), xai_tool_runtime::ToolError> {
         if self.api_backend.as_deref() == Some("chat_completions") {
-            return self.search_chat_completions_with_titles(query, allowed_domains).await;
+            return self
+                .search_chat_completions_with_titles(query, allowed_domains)
+                .await;
         }
-        self.search_responses_with_titles(query, allowed_domains).await
+        self.search_responses_with_titles(query, allowed_domains)
+            .await
     }
 
     async fn search_responses_with_titles(
@@ -527,10 +528,7 @@ async fn search_chat_completions_with_titles_inner(
         "max_completion_tokens": 8192,
         "stream": false
     });
-    let url = format!(
-        "{}/chat/completions",
-        client.base_url.trim_end_matches('/')
-    );
+    let url = format!("{}/chat/completions", client.base_url.trim_end_matches('/'));
     let sent_bearer = client.current_bearer().await;
     let auth_key = sent_bearer.as_deref().unwrap_or(&client.api_key);
     let response = client
@@ -577,13 +575,12 @@ async fn search_chat_completions_with_titles_inner(
             format!("Failed to read response body: {e}"),
         )
     })?;
-    let response_json: serde_json::Value =
-        serde_json::from_slice(&body_bytes).map_err(|e| {
-            xai_tool_runtime::ToolError::execution(
-                xai_tool_protocol::ToolId::new("web_search").expect("valid"),
-                format!("Failed to parse response: {e}"),
-            )
-        })?;
+    let response_json: serde_json::Value = serde_json::from_slice(&body_bytes).map_err(|e| {
+        xai_tool_runtime::ToolError::execution(
+            xai_tool_protocol::ToolId::new("web_search").expect("valid"),
+            format!("Failed to parse response: {e}"),
+        )
+    })?;
     let content = response_json["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("No search results found.")
@@ -629,11 +626,11 @@ mod tests {
         invocations: std::sync::Mutex<Vec<(ToolConsumer, Option<String>)>>,
     }
     impl crate::attribution::Auth401AttributionCallback for CountingCallback {
-        fn record_401(&self, consumer: ToolConsumer, sent_bearer_prefix: Option<&str>) {
+        fn record_401(&self, consumer: ToolConsumer, sent_bearer_suffix: Option<&str>) {
             self.invocations
                 .lock()
                 .unwrap()
-                .push((consumer, sent_bearer_prefix.map(|s| s.to_string())));
+                .push((consumer, sent_bearer_suffix.map(|s| s.to_string())));
         }
     }
     /// `record_401_attribution` invokes the wired callback with
@@ -655,14 +652,14 @@ mod tests {
         let client = WebSearchClient::new(&config, None)
             .expect("client should build")
             .with_attribution_callback(Some(cb_dyn));
-        client.record_401_attribution(Some("bearer-with-long-tail-aaaaaaaaaa"));
+        client.record_401_attribution(Some("bearer-with-long-tail-aaaadistinct"));
         let calls = cb.invocations.lock().unwrap();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].0, ToolConsumer::WebSearch);
-        assert_eq!(calls[0].1.as_deref(), Some("bearer-with-"));
+        assert_eq!(calls[0].1.as_deref(), Some("aaaadistinct"));
         assert_eq!(
             calls[0].1.as_deref().map(str::len),
-            Some(crate::attribution::SENT_BEARER_PREFIX_LEN),
+            Some(crate::attribution::BEARER_SUFFIX_LEN),
         );
     }
     /// `record_401_attribution` is a no-op when no callback is wired

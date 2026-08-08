@@ -204,9 +204,9 @@ const GOAL_PLANNER_SUBAGENT_TYPE: &str = "implementor";
 pub(crate) fn goal_role_subagent_type(role: &str) -> &'static str {
     match role {
         "planner" => GOAL_PLANNER_SUBAGENT_TYPE,
-        "strategist" => "architect",    // GOAL_STRATEGIST_SUBAGENT_TYPE
-        "skeptic" => "verifier",        // GOAL_CLASSIFIER_SUBAGENT_TYPE
-        _ => GOAL_ROLE_SUBAGENT_TYPE,   // summarizer + future roles
+        "strategist" => "architect",  // GOAL_STRATEGIST_SUBAGENT_TYPE
+        "skeptic" => "verifier",      // GOAL_CLASSIFIER_SUBAGENT_TYPE
+        _ => GOAL_ROLE_SUBAGENT_TYPE, // summarizer + future roles
     }
 }
 
