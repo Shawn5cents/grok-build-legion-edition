@@ -1,0 +1,31 @@
+[preset]
+required_env = ["DEEPSEEK_API_KEY"]
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "deepseek-v4-pro"
+explore = "deepseek-v4-flash"
+architect = "deepseek-v4-pro"
+implementor = "deepseek-v4-pro"
+verifier = "deepseek-v4-pro"
+plan = "deepseek-v4-pro"
+general-purpose = "deepseek-v4-pro"
+
+[subagents.fallback]
+verifier = "deepseek-v4-pro"
+
+[model.deepseek-v4-pro]
+model = "deepseek-v4-pro"
+base_url = "http://127.0.0.1:8787/deepseek/v1"
+name = "DeepSeek V4 Pro (Cheapskate)"
+env_key = "DEEPSEEK_API_KEY"
+context_window = 1000000
+
+[model.deepseek-v4-flash]
+model = "deepseek-v4-flash"
+base_url = "http://127.0.0.1:8787/deepseek/v1"
+name = "DeepSeek V4 Flash (Cheapskate)"
+env_key = "DEEPSEEK_API_KEY"
+context_window = 1000000

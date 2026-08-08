@@ -117,12 +117,49 @@ def atomic_write(path: Path, content: str, *, private: bool = True) -> None:
 
 
 _TABLE_HEADER_RE = re.compile(r"(?m)^[ \t]*\[([^\]\r\n]+)\][ \t]*(?:#.*)?$")
+_TABLE_PATH_MARKER = "__legion_table_path_marker__"
+
+
+def _table_path(raw_table_name: str) -> tuple[str, ...] | None:
+    """Return a TOML table's semantic key path.
+
+    TOML treats ``[model.deepseek-v4-pro]`` and
+    ``[model.\"deepseek-v4-pro\"]`` as the same table. Comparing their header
+    text would miss that equivalence and append a duplicate declaration.
+    """
+    try:
+        parsed = tomllib.loads(
+            f"[{raw_table_name}]\n{_TABLE_PATH_MARKER} = true\n"
+        )
+    except tomllib.TOMLDecodeError:
+        return None
+
+    path: list[str] = []
+    current: Any = parsed
+    while isinstance(current, dict):
+        if current.get(_TABLE_PATH_MARKER) is True:
+            return tuple(path)
+        children = [
+            (key, value) for key, value in current.items() if isinstance(value, dict)
+        ]
+        if len(children) != 1:
+            return None
+        key, current = children[0]
+        path.append(str(key))
+    return None
 
 
 def _table_span(content: str, raw_table_name: str) -> tuple[int, int] | None:
     matches = list(_TABLE_HEADER_RE.finditer(content))
+    requested_path = _table_path(raw_table_name)
     for index, match in enumerate(matches):
-        if match.group(1).strip() == raw_table_name:
+        candidate = match.group(1).strip()
+        same_table = (
+            _table_path(candidate) == requested_path
+            if requested_path is not None
+            else candidate == raw_table_name
+        )
+        if same_table:
             end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
             return match.start(), end
     return None
@@ -148,9 +185,15 @@ def replace_table(content: str, raw_table_name: str, values: Mapping[str, Any]) 
     if span is None:
         # TOML dotted tables create their parents implicitly. If a parent table
         # needs explicit scalar keys, it must be inserted before its first child.
-        child_prefix = f"{raw_table_name}."
+        parent_path = _table_path(raw_table_name)
         for match in _TABLE_HEADER_RE.finditer(content):
-            if match.group(1).strip().startswith(child_prefix):
+            child_path = _table_path(match.group(1).strip())
+            if (
+                parent_path is not None
+                and child_path is not None
+                and len(child_path) > len(parent_path)
+                and child_path[: len(parent_path)] == parent_path
+            ):
                 before = content[: match.start()].rstrip()
                 after = content[match.start() :].lstrip("\n")
                 pieces = [piece for piece in (before, block.rstrip(), after.rstrip()) if piece]

@@ -15,6 +15,26 @@ from typing import Any
 
 import legion_common as common
 
+DEEPSEEK_DIRECT_ENDPOINT = "https://api.deepseek.com/v1"
+CHEAPSKATE_DEEPSEEK_ENDPOINT = "http://127.0.0.1:8787/deepseek/v1"
+
+
+def deepseek_endpoint() -> str:
+    """Select the DeepSeek route without changing model or credential wiring.
+
+    ``LEGION_DEEPSEEK_BASE_URL`` is intentionally an explicit override: unset
+    keeps auto-discovery backward-compatible with direct DeepSeek access.
+    ``LEGION_USE_CHEAPSKATE=1`` opts into the local Cheapskate default.
+    """
+    override = os.environ.get("LEGION_DEEPSEEK_BASE_URL", "").strip()
+    if override:
+        return override.rstrip("/")
+    if os.environ.get("LEGION_USE_CHEAPSKATE", "").strip().lower() in {
+        "1", "true", "yes", "on"
+    }:
+        return CHEAPSKATE_DEEPSEEK_ENDPOINT
+    return DEEPSEEK_DIRECT_ENDPOINT
+
 PROVIDERS = [
     {
         "id": "opencode",
@@ -55,7 +75,7 @@ PROVIDERS = [
             ("deepseek-v4-pro", "deepseek-v4-pro", "DeepSeek V4 Pro", 1_000_000),
             ("deepseek-v4-flash", "deepseek-v4-flash", "DeepSeek V4 Flash", 1_000_000),
         ],
-        "endpoint": "https://api.deepseek.com/v1",
+        "endpoint": DEEPSEEK_DIRECT_ENDPOINT,
     },
     {
         "id": "minimax",
@@ -291,10 +311,13 @@ def main() -> int:
             continue
         provider_ids.add(provider["id"])
         print(f"  [✓] Provider credential: {selected_key}")
+        endpoint = (
+            deepseek_endpoint() if provider["id"] == "deepseek" else provider["endpoint"]
+        )
         for catalog_id, model, name, context in provider["models"]:
             entries[catalog_id] = model_entry(
                 model=model,
-                endpoint=provider["endpoint"],
+                endpoint=endpoint,
                 name=name,
                 context_window=context,
                 env_keys=provider["keys"],

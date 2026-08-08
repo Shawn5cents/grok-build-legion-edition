@@ -1037,6 +1037,7 @@ impl ApiBackend {
     pub fn native_json_schema_supported(&self, base_url: &str) -> bool {
         matches!(self, Self::ChatCompletions | Self::Responses)
             && !base_url.contains("api.deepseek.com")
+            && !base_url.contains("/deepseek/")
     }
 
     /// Whether the backend enforces a response JSON schema natively alongside
@@ -1677,6 +1678,11 @@ mod tests {
         assert!(
             ApiBackend::ChatCompletions
                 .native_json_schema_supported("https://openrouter.ai/api/v1")
+        );
+        // Cheapskate-proxied DeepSeek: localhost on 8787 with /deepseek/ route
+        assert!(
+            !ApiBackend::ChatCompletions
+                .native_json_schema_supported("http://127.0.0.1:8787/deepseek/v1")
         );
     }
 }
