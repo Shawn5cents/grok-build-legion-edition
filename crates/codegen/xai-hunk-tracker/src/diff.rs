@@ -88,9 +88,17 @@ pub fn generate_hunk_patch(baseline: &str, current: &str, hunk: &Hunk) -> String
     let old_start_idx = hunk.line_info.old_start.saturating_sub(1);
     let new_start_idx = hunk.line_info.new_start.saturating_sub(1);
 
-    // Context before the change
-    let context_before_start = old_start_idx.saturating_sub(CONTEXT_LINES);
+    // Context before the change, in BOTH old- and new-file coordinates.
+    // When an earlier hunk has a net line delta, old_start and new_start
+    // diverge; the `+` header and context must use new-file coordinates to
+    // be self-consistent. Clamp both windows to the same length (they can
+    // differ near the start of the file when one saturates at line 1 before
+    // the other) so the emitted context lines match both header ranges.
     let context_before_end = old_start_idx;
+    let context_before_end_new = new_start_idx;
+    let context_before_len = old_start_idx.min(new_start_idx).min(CONTEXT_LINES);
+    let context_before_start = context_before_end - context_before_len;
+    let context_before_start_new = context_before_end_new - context_before_len;
 
     // Context after the change (in new file coordinates)
     let changes_end_new = new_start_idx + hunk.line_info.new_count;
@@ -103,16 +111,15 @@ pub fn generate_hunk_patch(baseline: &str, current: &str, hunk: &Hunk) -> String
     let context_after_end_old = (changes_end_old + CONTEXT_LINES).min(old_lines.len());
 
     // Calculate total lines for header
-    let total_old_lines = (context_before_end - context_before_start)
+    let total_old_lines = context_before_len
         + hunk.line_info.old_count
         + (context_after_end_old - context_after_start_old);
-    let total_new_lines = (context_before_end - context_before_start)
-        + hunk.line_info.new_count
-        + (context_after_end - context_after_start);
+    let total_new_lines =
+        context_before_len + hunk.line_info.new_count + (context_after_end - context_after_start);
 
     // Hunk header (1-indexed)
     let header_old_start = context_before_start + 1;
-    let header_new_start = context_before_start + 1; // Context is same in both
+    let header_new_start = context_before_start_new + 1;
 
     let _ = writeln!(
         output,
@@ -120,9 +127,12 @@ pub fn generate_hunk_patch(baseline: &str, current: &str, hunk: &Hunk) -> String
         header_old_start, total_old_lines, header_new_start, total_new_lines
     );
 
-    // Context lines before
-    for i in context_before_start..context_before_end {
-        if let Some(line) = old_lines.get(i) {
+    // Context lines before (from the new file at new-file coordinates, so the
+    // `+` header range stays self-consistent when an earlier hunk shifted line
+    // numbers; lines between hunks are Equal in the common case, so the old
+    // side sees identical content)
+    for i in context_before_start_new..context_before_end_new {
+        if let Some(line) = new_lines.get(i) {
             let _ = writeln!(output, " {}", line);
         }
     }
@@ -830,6 +840,47 @@ mod tests {
         let delete_patch = generate_hunk_patch(baseline, current, delete_hunk);
         assert!(delete_patch.contains("-line 4"));
         assert!(!delete_patch.contains("+line 4"));
+    }
+
+    #[test]
+    fn test_generate_hunk_patch_shifted_hunk_uses_new_file_coordinates() {
+        // Delete l2 (H1), then insert X after l8 (H2). H2 is shifted by -1 in
+        // new-file coordinates (old_start=9, new_start=8). The fragment's `+`
+        // header and context-before lines must use new-file coordinates.
+        let baseline = "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\n";
+        let current = "l1\nl3\nl4\nl5\nl6\nl7\nl8\nX\nl9\nl10\n";
+
+        let hunks = compute_hunks(Path::new("test.rs"), baseline, current, agent_source());
+        assert_eq!(hunks.len(), 2);
+
+        assert_eq!(
+            (
+                hunks[0].line_info.old_start,
+                hunks[0].line_info.old_count,
+                hunks[0].line_info.new_start,
+                hunks[0].line_info.new_count
+            ),
+            (2, 1, 2, 0),
+            "H1: delete l2"
+        );
+        assert_eq!(
+            (
+                hunks[1].line_info.old_start,
+                hunks[1].line_info.old_count,
+                hunks[1].line_info.new_start,
+                hunks[1].line_info.new_count
+            ),
+            (9, 0, 8, 1),
+            "H2: insert X, shifted by -1 in new coordinates"
+        );
+
+        // H2 fragment: `+` side starts at 5 (new coords), not 6 (old coords).
+        let patch_h2 = generate_hunk_patch(baseline, current, &hunks[1]);
+        assert_eq!(patch_h2, "@@ -6,5 +5,6 @@\n l6\n l7\n l8\n+X\n l9\n l10\n");
+
+        // H1 fragment is unshifted and must remain well-formed.
+        let patch_h1 = generate_hunk_patch(baseline, current, &hunks[0]);
+        assert_eq!(patch_h1, "@@ -1,5 +1,4 @@\n l1\n-l2\n l3\n l4\n l5\n");
     }
 
     #[test]

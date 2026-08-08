@@ -1975,6 +1975,7 @@ pub mod gc {
         #[test]
         fn is_pid_alive_false_for_reaped_child() {
             // A fully reaped child's pid is gone (ESRCH) and must read as dead.
+            #[allow(clippy::disallowed_methods)] // test fixture; the test reaps it
             let mut child = std::process::Command::new("true")
                 .spawn()
                 .expect("spawn `true`");
@@ -3593,7 +3594,7 @@ mod tests {
         }
 
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        fn wait_until(pred: impl Fn() -> bool) -> bool {
+        fn wait_until(mut pred: impl FnMut() -> bool) -> bool {
             use std::time::Duration;
             for _ in 0..200 {
                 if pred() {
@@ -3605,8 +3606,8 @@ mod tests {
         }
 
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        #[test]
-        fn gc_cwd_guard_skips_then_reclaims_expired_worktree() {
+        #[tokio::test]
+        async fn gc_cwd_guard_skips_then_reclaims_expired_worktree() {
             let _cwd_lock = crate::api::cwd_test_guard();
             let tmp = tempfile::TempDir::new().unwrap();
             let db = db_at(&tmp);
@@ -3631,11 +3632,10 @@ mod tests {
             };
             db.register(&record).unwrap();
 
-            let mut child = std::process::Command::new("sleep")
-                .arg("30")
-                .current_dir(&nested)
-                .spawn()
-                .expect("spawn sleep");
+            let scope = xai_tty_utils::ProcessScope::new();
+            let mut cmd = tokio::process::Command::new("sleep");
+            cmd.arg("30").current_dir(&nested);
+            let (mut child, _group) = scope.spawn(cmd).expect("spawn sleep");
             let want = dunce::canonicalize(&nested).unwrap();
             assert!(
                 wait_until(|| scan_has_cwd_under(&want)),
@@ -3657,8 +3657,11 @@ mod tests {
             assert!(dir.exists());
 
             // Once the process exits, the same expired worktree is reclaimed.
-            child.kill().ok();
-            child.wait().ok();
+            child.start_kill().ok();
+            assert!(
+                wait_until(|| child.try_wait().ok().flatten().is_some()),
+                "child must exit after kill before reclaim"
+            );
             assert!(
                 wait_until(|| !scan_has_cwd_under(&want)),
                 "child CWD must leave the scan after exit before reclaim"

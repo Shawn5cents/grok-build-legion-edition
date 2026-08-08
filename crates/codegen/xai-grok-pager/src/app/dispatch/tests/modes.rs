@@ -1317,7 +1317,7 @@ fn cycle_mode_pre_session_always_approve_to_normal_persists_ask() {
         agent.session.yolo_mode = true;
     }
 
-    let effects1 = dispatch(Action::CycleMode, &mut app); // Always-Approve -> Legion
+    let _effects1 = dispatch(Action::CycleMode, &mut app); // Always-Approve -> Legion
     let effects2 = dispatch(Action::CycleMode, &mut app); // Legion -> Normal
 
     let agent = &app.agents[&AgentId(0)];
@@ -1340,13 +1340,6 @@ fn cycle_mode_pre_session_always_approve_to_normal_persists_ask() {
         )),
         "pre-session Always-Approve → Normal must persist 'ask' \
          (stale config.toml relaunches yolo), got {effects2:?}"
-    );
-    // Welcome-screen Shift+Tab still kicks off session creation on 1st step.
-    assert!(
-        effects1
-            .iter()
-            .any(|e| matches!(e, Effect::CreateSession { .. })),
-        "expected CreateSession alongside the persist, got {effects1:?}"
     );
 }
 

@@ -31,6 +31,7 @@ fn test_config_with_window(context_window: u64) -> SamplingConfig {
             .expect("test context_window must be non-zero"),
         reasoning_effort: None,
         stream_tool_calls: None,
+        supports_structured_output: true,
     }
 }
 
@@ -468,6 +469,7 @@ async fn record_last_turn_usage_round_trip() {
         total_tokens: 1290,
         reasoning_tokens: 0,
         cached_prompt_tokens: 800,
+        cache_creation_prompt_tokens: 0,
     };
     h.handle.record_last_turn_usage(usage.clone());
 
@@ -483,6 +485,7 @@ async fn record_last_turn_usage_round_trip() {
         total_tokens: 10000,
         reasoning_tokens: 0,
         cached_prompt_tokens: 0,
+        cache_creation_prompt_tokens: 0,
     };
     h.handle.record_last_turn_usage(next);
     let got2 = h
@@ -504,6 +507,7 @@ async fn prompt_usage_ledger_via_handle_resets_and_clears() {
         total_tokens: 12,
         reasoning_tokens: 0,
         cached_prompt_tokens: 0,
+        cache_creation_prompt_tokens: 0,
     };
 
     let h = TestHarness::new();
@@ -1177,6 +1181,7 @@ async fn update_sampling_config_is_queryable() {
         context_window: NonZeroU64::new(200_000).unwrap(),
         reasoning_effort: None,
         stream_tool_calls: None,
+        supports_structured_output: true,
     };
     h.handle.update_sampling_config(new_config.clone());
 
@@ -1564,6 +1569,7 @@ async fn build_request_uses_sampling_config() {
         context_window: NonZeroU64::new(128_000).unwrap(),
         reasoning_effort: None,
         stream_tool_calls: None,
+        supports_structured_output: true,
     };
     let h = TestHarness::with_config(vec![ConversationItem::user("hi")], config);
 
@@ -3707,6 +3713,7 @@ async fn sampling_config_survives_compaction_replacement() {
         context_window: NonZeroU64::new(500_000).unwrap(),
         reasoning_effort: None,
         stream_tool_calls: None,
+        supports_structured_output: true,
     };
 
     let h = TestHarness::with_config(
@@ -3792,6 +3799,7 @@ async fn model_metadata_lost_after_compaction_then_recovered_on_next_turn() {
         context_window: NonZeroU64::new(500_000).unwrap(),
         reasoning_effort: None,
         stream_tool_calls: None,
+        supports_structured_output: true,
     };
 
     let h = TestHarness::with_config(
@@ -3882,6 +3890,7 @@ async fn context_window_downgrade_triggers_auto_compact() {
         context_window: NonZeroU64::new(500_000).unwrap(),
         reasoning_effort: None,
         stream_tool_calls: None,
+        supports_structured_output: true,
     };
 
     let h = TestHarness::with_config(vec![], config);

@@ -460,6 +460,7 @@ impl ToolCallRequest {
 pub struct ChatCompletionResponse {
     pub id: String,
     pub object: String,
+    #[serde(default)]
     pub created: u64,
     pub model: String,
     pub choices: Vec<ChatChoice>,
@@ -534,8 +535,13 @@ impl ToolCallFunction {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Usage {
+    // MiniMax (and some OpenRouter proxies) omit usage fields or rename them.
+    // Defaults keep deserialization from aborting an otherwise-valid completion.
+    #[serde(default)]
     pub prompt_tokens: u32,
+    #[serde(default)]
     pub completion_tokens: u32,
+    #[serde(default)]
     pub total_tokens: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<PromptTokensDetails>,
@@ -573,6 +579,7 @@ pub struct CompletionTokensDetails {
 pub struct ChatCompletionChunk {
     pub id: String,
     pub object: String,
+    #[serde(default)]
     pub created: u64,
     pub model: String,
     pub choices: Vec<ChatChunkChoice>,
@@ -1021,11 +1028,36 @@ pub enum ApiBackend {
 }
 
 impl ApiBackend {
+    /// Whether the backend natively enforces a response JSON schema alongside
+    /// tool calls (`response_format: json_schema`). The Messages API does not
+    /// (a schema there blocks tool use), so structured output there goes
+    /// through the `StructuredOutput` tool. Not all ChatCompletions providers
+    /// support `json_schema` — e.g. DeepSeek's native API only supports
+    /// `json_object`, so it must also use the tool fallback.
+    pub fn native_json_schema_supported(&self, base_url: &str) -> bool {
+        matches!(self, Self::ChatCompletions | Self::Responses)
+            && !base_url.contains("api.deepseek.com")
+            && !base_url.contains("/deepseek/")
+    }
+
     /// Whether the backend enforces a response JSON schema natively alongside
     /// tool calls. The Messages API does not (a schema there blocks tool use),
     /// so structured output there goes through the StructuredOutput tool.
+    #[deprecated(since = "TBD", note = "use `native_json_schema_supported`")]
     pub fn supports_native_schema(&self) -> bool {
         matches!(self, Self::ChatCompletions | Self::Responses)
+    }
+
+    /// Whether replayed reasoning must be stripped. Only the Messages API rejects thinking blocks sent without a top-level `thinking` config.
+    pub fn requires_reasoning_strip(&self) -> bool {
+        matches!(self, Self::Messages)
+    }
+
+    /// Whether [`ConversationRequest::prompt_cache_key`] reaches the wire. Only the Responses mapping sends it, so a key set elsewhere is inert.
+    ///
+    /// [`ConversationRequest::prompt_cache_key`]: crate::conversation::ConversationRequest::prompt_cache_key
+    pub fn forwards_prompt_cache_key(&self) -> bool {
+        matches!(self, Self::Responses)
     }
 }
 
@@ -1059,6 +1091,16 @@ pub struct SamplingConfig {
     /// API request body so the upstream emits per-chunk argument deltas.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream_tool_calls: Option<bool>,
+    /// When false, always use the StructuredOutput tool instead of native
+    /// response_format json_schema, even on backends that normally support it.
+    /// Set to false for models that can't produce schema-valid JSON via
+    /// native response_format (e.g., some OpenRouter models like qwen3-flash).
+    #[serde(default = "default_true")]
+    pub supports_structured_output: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 // ============ Responses API wrapper ============
@@ -1204,6 +1246,100 @@ impl From<crate::messages::MessagesRequest> for MessagesRequestWrapper {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    // ===== FT-003: MiniMax-shaped payload tolerance =====
+    //
+    // MiniMax (and some OpenRouter proxies) omit `created` on both the
+    // non-streaming response and streaming chunks, and ship a `usage` object
+    // without the OpenAI token fields. Before `#[serde(default)]` these aborted
+    // the whole completion with "serialization error: missing field ...".
+    // These tests pin that tolerance so the defaults are never dropped.
+
+    #[test]
+    fn minimax_response_missing_created_and_usage_token_fields_deserializes() {
+        let raw = json!({
+            "id": "chatcmpl-minimax-1",
+            "object": "chat.completion",
+            // no "created"
+            "model": "minimax-m3",
+            "choices": [{
+                "index": 0,
+                "message": { "role": "assistant", "content": "hello" },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                // no prompt_tokens / completion_tokens / total_tokens
+                "prompt_tokens_details": { "cached_tokens": 7 }
+            }
+        });
+
+        let resp: ChatCompletionResponse =
+            serde_json::from_value(raw).expect("MiniMax response must deserialize with defaults");
+
+        assert_eq!(resp.created, 0, "missing `created` defaults to 0");
+        assert_eq!(resp.id, "chatcmpl-minimax-1");
+        assert_eq!(resp.model, "minimax-m3");
+
+        let usage = resp.usage.expect("usage present");
+        assert_eq!(
+            usage.prompt_tokens, 0,
+            "missing prompt_tokens defaults to 0"
+        );
+        assert_eq!(
+            usage.completion_tokens, 0,
+            "missing completion_tokens defaults to 0"
+        );
+        assert_eq!(usage.total_tokens, 0, "missing total_tokens defaults to 0");
+        assert_eq!(
+            usage
+                .prompt_tokens_details
+                .expect("details preserved")
+                .cached_tokens,
+            7,
+            "present nested fields still parse"
+        );
+
+        let choice = &resp.choices[0];
+        assert_eq!(choice.message.content.as_deref(), Some("hello"));
+        assert_eq!(choice.finish_reason, Some(FinishReason::Stop));
+    }
+
+    #[test]
+    fn minimax_chunk_missing_created_deserializes() {
+        let raw = json!({
+            "id": "chatcmpl-minimax-2",
+            "object": "chat.completion.chunk",
+            // no "created"
+            "model": "minimax-m3",
+            "choices": [{
+                "index": 0,
+                "delta": { "content": "partial" }
+            }]
+        });
+
+        let chunk: ChatCompletionChunk =
+            serde_json::from_value(raw).expect("MiniMax chunk must deserialize with defaults");
+
+        assert_eq!(chunk.created, 0, "missing `created` defaults to 0");
+        assert_eq!(chunk.id, "chatcmpl-minimax-2");
+        assert!(chunk.usage.is_none(), "absent usage stays None");
+        assert_eq!(chunk.choices[0].delta.content.as_deref(), Some("partial"));
+    }
+
+    #[test]
+    fn minimax_empty_usage_object_deserializes_to_all_zero() {
+        // Most degenerate observed shape: `"usage": {}`.
+        let usage: Usage = serde_json::from_value(json!({})).expect("empty usage object is valid");
+        assert_eq!(
+            (
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                usage.total_tokens
+            ),
+            (0, 0, 0)
+        );
+        assert!(usage.cost_in_usd_ticks.is_none());
+    }
 
     #[test]
     fn reasoning_effort_serde_lowercase_round_trip() {
@@ -1519,5 +1655,34 @@ mod tests {
         let inner: &dyn TraceContext = &*cloned_trace;
         let downcast = inner.as_any().downcast_ref::<TestTrace>().unwrap();
         assert_eq!(downcast.0, "trace-data");
+    }
+
+    #[test]
+    fn native_json_schema_excludes_deepseek() {
+        assert!(
+            ApiBackend::ChatCompletions.native_json_schema_supported("https://api.openai.com/v1")
+        );
+        assert!(
+            !ApiBackend::ChatCompletions
+                .native_json_schema_supported("https://api.deepseek.com/v1")
+        );
+        assert!(
+            !ApiBackend::ChatCompletions.native_json_schema_supported("https://api.deepseek.com/")
+        );
+        // Messages backend always unsupported regardless of URL
+        assert!(!ApiBackend::Messages.native_json_schema_supported("https://api.openai.com/v1"));
+        assert!(!ApiBackend::Messages.native_json_schema_supported("https://api.deepseek.com/v1"));
+        // Responses backend should still work (OpenAI-native)
+        assert!(ApiBackend::Responses.native_json_schema_supported("https://api.openai.com/v1"));
+        // OpenRouter should pass (not a DeepSeek endpoint)
+        assert!(
+            ApiBackend::ChatCompletions
+                .native_json_schema_supported("https://openrouter.ai/api/v1")
+        );
+        // Cheapskate-proxied DeepSeek: localhost on 8787 with /deepseek/ route
+        assert!(
+            !ApiBackend::ChatCompletions
+                .native_json_schema_supported("http://127.0.0.1:8787/deepseek/v1")
+        );
     }
 }

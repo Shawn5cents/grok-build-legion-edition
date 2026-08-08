@@ -133,6 +133,36 @@ These controls work with any provider; DeepSeek is simply a particularly good
 fit because its long-context, tool-using workflow benefits from repeated
 inspection, repair, and verification turns.
 
+#### DeepSeek verifier compatibility
+
+DeepSeek's native API does not accept `response_format: json_schema` when the
+verifier also has tools. Legion detects both the direct DeepSeek endpoint and
+the Cheapskate `/deepseek/` route and automatically uses the `StructuredOutput`
+tool fallback instead. OpenAI-compatible gateways that support native JSON
+schemas continue to use the native path.
+
+### DeepSeek through Cheapskate
+
+Legion keeps DeepSeek routing in its provider configuration. Apply
+`presets/legion-cheapskate-dag.toml` to use the local Cheapskate endpoint while
+keeping `DEEPSEEK_API_KEY` unchanged. Direct access remains available through
+the existing `legion-dag.toml` preset, or when generating a preset with:
+
+```bash
+LEGION_DEEPSEEK_BASE_URL=https://api.deepseek.com/v1 ./tools/auto-discover.py --activate
+```
+
+To select Cheapskate during auto-discovery, set
+`LEGION_USE_CHEAPSKATE=1`; its default endpoint is
+`http://127.0.0.1:8787/deepseek/v1`. Legion does not implement caching,
+compaction, artifact storage, pricing, lineage, or statistics; those remain
+Cheapskate responsibilities.
+
+If the local proxy is stopped, remove the override or regenerate the active
+profile with the direct route shown above. Auto-discovery preserves existing
+model credentials and safely updates equivalent quoted or unquoted TOML model
+tables without creating duplicates.
+
 ---
 
 ## 🎛️ Interactive Hub & Configuration Tools

@@ -18,14 +18,18 @@ use xai_grok_tools::implementations::grok_build::task::types::{
 
 // Shared per-role model override + spawn-and-retry-once fail-open wrapper
 
-/// Every `/goal` role (planner, strategist, each verifier skeptic) spawns its
-/// subagent as `general-purpose`. The role's configured `agent_type` selects
-/// only the HARNESS (system prompt + toolset flavor),
-/// threaded as [`SubagentRuntimeOverrides::harness_agent_type`]; the
-/// subagent_type stays fixed so the role keeps a capable toolset on whichever
-/// harness is chosen. Single source of truth shared by the three role spawners
-/// and the parent-side `describe_subagent_type` probe so the gated/probed
-/// toolset matches the spawned one.
+/// Legacy shared subagent type used only by the goal summarizer (which
+/// stays `general-purpose`). The other `/goal` roles now use their own
+/// DAG-routed subagent types:
+///
+/// - Planner    → `implementor`  (needs write; routes via [subagents.models].implementor)
+/// - Strategist → `architect`    (read-only diagnosis; routes via [subagents.models].architect)
+/// - Verifier   → `verifier`     (read+execute; routes via [subagents.models].verifier)
+///
+/// Each role's configured `agent_type` selects only the HARNESS (system
+/// prompt + toolset flavor), threaded as
+/// [`SubagentRuntimeOverrides::harness_agent_type`]; the subagent_type
+/// determines model routing and base toolset.
 ///
 /// [`SubagentRuntimeOverrides::harness_agent_type`]: xai_grok_tools::implementations::grok_build::task::types::SubagentRuntimeOverrides::harness_agent_type
 pub(crate) const GOAL_ROLE_SUBAGENT_TYPE: &str = "general-purpose";
@@ -48,7 +52,8 @@ pub(crate) struct RoleSpawnOverride {
     /// whose `AgentDefinition` decides the spawned subagent's harness flavor
     /// (system prompt + toolset), applied REGARDLESS of the
     /// parent agent. `None` ⇒ inherit the session harness. NOT a subagent type —
-    /// the subagent_type stays fixed at [`GOAL_ROLE_SUBAGENT_TYPE`].
+    /// the subagent_type is determined by each role's own constant
+    /// (planner→implementor, strategist→architect, verifier→verifier).
     pub agent_type: Option<String>,
 }
 
@@ -129,7 +134,7 @@ impl RetryableSpawnError for SpawnError {
 /// into a goal-pause).
 ///
 /// The `spawn` closure receives `(model, harness_agent_type, prompt)` and owns
-/// the fixed subagent_type ([`GOAL_ROLE_SUBAGENT_TYPE`]); the second arg is the
+/// the role's specific subagent_type; the second arg is the
 /// harness override (`None` ⇒ session harness), NOT a subagent type.
 ///
 /// The first attempt uses `prompt.primary` (rendered for the configured
@@ -186,11 +191,24 @@ where
 /// `/goal resume` retries, which re-run the planner unbounded.
 pub(crate) const GOAL_PLANNER_MAX_RUNS: u32 = 1;
 
-/// Same general-purpose inventory each verifier skeptic uses: the
-/// planner reads and greps the workspace and, when web search is
-/// enabled, researches external facts to clarify scope. The configured
+/// DAG-routed subagent type: `implementor` gives the planner full
+/// read/write/grep/file tool inventory needed to produce plan.md.
+/// Model routes via `[subagents.models].implementor` (minimax-m3 in
+/// mixed DAG) for cross-family plan generation. The configured
 /// `agent_type` selects the HARNESS, not this subagent type.
-const GOAL_PLANNER_SUBAGENT_TYPE: &str = GOAL_ROLE_SUBAGENT_TYPE;
+const GOAL_PLANNER_SUBAGENT_TYPE: &str = "implementor";
+
+/// Map a `/goal` role name to its DAG-routed subagent type. Used by the
+/// pre-spawn toolset probe so it checks the same subagent type the spawner
+/// will use, rather than a generic `general-purpose` default.
+pub(crate) fn goal_role_subagent_type(role: &str) -> &'static str {
+    match role {
+        "planner" => GOAL_PLANNER_SUBAGENT_TYPE,
+        "strategist" => "architect",  // GOAL_STRATEGIST_SUBAGENT_TYPE
+        "skeptic" => "verifier",      // GOAL_CLASSIFIER_SUBAGENT_TYPE
+        _ => GOAL_ROLE_SUBAGENT_TYPE, // summarizer + future roles
+    }
+}
 
 const GOAL_PLANNER_SUBAGENT_DESCRIPTION: &str = "goal plan writer";
 

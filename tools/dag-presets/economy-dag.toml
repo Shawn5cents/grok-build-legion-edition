@@ -1,0 +1,100 @@
+# =============================================================================
+# DAG label: ECONOMY  (aliases: cheap, daily, cost)
+# Use for: simple/medium tasks, daily driver, save full for hard work
+# Cost: LOW–MEDIUM  |  Restart TUI required after:  dag economy
+# =============================================================================
+# DeepSeek-primary multi-role DAG — still a real DAG (explore≠implement≠verify),
+# not a single-model blob. Cross-vendor fallbacks only fire if those keys exist.
+#
+# PRIMARY:
+#   main chat / orchestrator  deepseek-v4-pro
+#   explore                   deepseek-v4-flash   (cheap breadth)
+#   plan / architect /
+#   implementor / verifier /
+#   general-purpose           deepseek-v4-pro
+# FALLBACK (cross-vendor where useful):
+#   explore                   gpt-5.6-luna
+#   plan / implementor /
+#   general-purpose           gpt-5.6-luna
+#   architect / verifier      grok-4.5            (if XAI key present)
+#   orchestrator              deepseek-v4-flash   (last resort cheaper)
+# AUTH: needs DEEPSEEK_API_KEY at minimum. OPENAI/XAI optional for fallbacks.
+# =============================================================================
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "deepseek-v4-pro"
+explore = "deepseek-v4-flash"
+plan = "deepseek-v4-pro"
+architect = "deepseek-v4-pro"
+implementor = "deepseek-v4-pro"
+verifier = "deepseek-v4-pro"
+general-purpose = "deepseek-v4-pro"
+
+[subagents.fallback]
+orchestrator = "deepseek-v4-flash"
+explore = "gpt-5.6-luna"
+plan = "gpt-5.6-luna"
+architect = "grok-4.5"
+implementor = "gpt-5.6-luna"
+verifier = "grok-4.5"
+general-purpose = "gpt-5.6-luna"
+
+[model.deepseek-v4-pro]
+model = "deepseek-v4-pro"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Pro"
+env_key = ["DEEPSEEK_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1000000
+supports_structured_output = false
+[model.deepseek-v4-flash]
+model = "deepseek-v4-flash"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Flash"
+env_key = ["DEEPSEEK_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1000000
+supports_structured_output = false
+
+# Fallbacks only — not used as primaries in economy
+[model."gpt-5.6-luna"]
+model = "gpt-5.6-luna"
+base_url = "https://api.openai.com/v1"
+name = "GPT-5.6 Luna (fallback)"
+api_backend = "responses"
+env_key = ["OPENAI_API_KEY"]
+context_window = 1000000
+
+[model."grok-4.5"]
+model = "grok-4.5"
+base_url = "https://api.x.ai/v1"
+name = "Grok 4.5 (fallback)"
+env_key = ["XAI_API_KEY"]
+context_window = 1000000
+
+[marketplace]
+default_skills_installs_purged = true
+official_marketplace_auto_installed = true
+
+[[marketplace.sources]]
+name = "xAI Official"
+git = "https://github.com/xai-org/plugin-marketplace.git"
+
+[cli]
+installer = "internal"
+
+[ui]
+max_thoughts_width = 120
+fork_secondary_model = "deepseek-v4-flash"
+yolo = false
+compact_mode = false
+permission_mode = "always-approve"
+
+[features]
+remote_fetch = false
+
+[models]
+default = "deepseek-v4-pro"

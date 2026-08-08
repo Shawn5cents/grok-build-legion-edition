@@ -60,18 +60,23 @@ pub(super) fn task_model_override_error(
     name = "subagent.handle_request",
     skip_all,
     fields(
-        subagent_id = %request.id,
+        subagent_id = %run.request.id,
         parent_session_id = %ctx.parent_session_id,
-        subagent_type = %request.subagent_type,
+        subagent_type = %run.request.subagent_type,
     )
 )]
 pub(crate) async fn run_shell_child(
-    mut request: SubagentRequest,
+    run: grok_build::task::coordinator::ChildRunRequest<ShellChildRuntime>,
     mut ctx: SubagentSpawnContext,
-    cancel_token: CancellationToken,
-    reporter: ChildReporter<ShellChildRuntime>,
     gateway: &GatewaySender,
 ) -> ChildRunOutput<ShellCompletionData> {
+    let grok_build::task::coordinator::ChildRunRequest {
+        mut request,
+        cancellation: cancel_token,
+        reporter,
+        queued_for,
+        session_running,
+    } = run;
     let start = std::time::Instant::now();
     let mut completion_data = ShellCompletionData::from_context(&ctx);
     if request.owner.is_workflow() && cancel_token.is_cancelled() {
@@ -412,8 +417,7 @@ pub(crate) async fn run_shell_child(
         .spawn_depth
         .unwrap_or(ctx.parent_depth + 1);
     let tools_before_policy = definition.tool_config.tools.len();
-    let allow_nested_subagents =
-        child_depth < xai_grok_tools::implementations::grok_build::task::MAX_SUBAGENT_DEPTH;
+    let allow_nested_subagents = child_depth < ctx.subagents_max_depth;
     xai_grok_subagent_resolution::apply_child_tool_policy(
         &mut definition,
         effective_runtime.capability_mode,
@@ -496,6 +500,31 @@ pub(crate) async fn run_shell_child(
             );
             return child_run_output(failure_result(&request, &msg), completion_data, None);
         }
+    }
+    // FT-007: a previous spawn of this role already burned its primary model
+    // (fallback-worthy hard fail). Start this spawn directly on the sticky
+    // fallback instead of re-hitting the same wall. Skipped for resumed
+    // children (pinned to the source model) and forked children (pinned to the
+    // parent model) — those pins are stronger than the sticky hint.
+    let mut used_sticky_or_fallback = false;
+    if resume_source.is_none()
+        && !request.fork_context
+        && let Some(sticky_model) = super::sticky_fallback_get(&request.subagent_type)
+        && sticky_model != effective_model_id.0.as_ref()
+        && let Some((sticky_config, sticky_model_id)) =
+            resolve_model_override_to_config(&sticky_model, &ctx)
+        && sticky_model_id != effective_model_id
+    {
+        tracing::warn!(
+            subagent_id = %request.id,
+            subagent_type = %request.subagent_type,
+            was_model = %effective_model_id.0,
+            sticky_model = %sticky_model_id.0,
+            "FT-007 sticky fallback HIT — starting spawn on fallback model"
+        );
+        effective_sampling_config = sticky_config;
+        effective_model_id = sticky_model_id;
+        used_sticky_or_fallback = true;
     }
     if let Some(raw) = effective_runtime.reasoning_effort.as_deref()
         && ctx
@@ -717,15 +746,9 @@ pub(crate) async fn run_shell_child(
         }
     };
     let child_cwd = resolve_child_cwd(worktree_path.as_deref(), override_cwd, &ctx.parent_cwd);
-    let cwd_outside_parent = match (
-        dunce::canonicalize(&child_cwd),
-        dunce::canonicalize(&ctx.parent_cwd),
-    ) {
-        (Ok(child), Ok(parent)) => !child.starts_with(&parent),
-        _ => child_cwd != ctx.parent_cwd,
-    };
+    let covered_by_parent = xai_fsnotify::watch_root_covers(&ctx.parent_cwd, &child_cwd);
     let subagent_fs_watch = FsWatchCapabilities {
-        hunk_tracking: ctx.hunk_tracking_enabled && cwd_outside_parent,
+        hunk_tracking: ctx.hunk_tracking_enabled && !covered_by_parent,
         ..FsWatchCapabilities::none()
     };
     let child_cwd_abs = xai_grok_paths::AbsPathBuf::new(child_cwd).unwrap_or_else(|_| {
@@ -752,6 +775,7 @@ pub(crate) async fn run_shell_child(
     tool_ctx.monitor_event_buffer = Some(MonitorEventBuffer::default());
     tool_ctx.subagent_depth = child_depth;
     tool_ctx.lsp = ctx.lsp.clone();
+    tool_ctx.process_scope = ctx.process_scope.clone();
     let parent_traceparent = xai_file_utils::trace_context::current_traceparent();
     let tracker_child_cwd = child_session_info.cwd.clone();
     let tracker_model_id = effective_model_id.0.to_string();
@@ -866,7 +890,11 @@ pub(crate) async fn run_shell_child(
             let hooks_val = hooks_config.as_value();
             let (specs, errors) = xai_grok_hooks::config::parse_hooks_from_value_with_dir(
                 &hooks_val,
-                &format!("agent:{}", definition.name),
+                &format!(
+                    "{}{}",
+                    xai_grok_hooks::config::AGENT_HOOK_PREFIX,
+                    definition.name
+                ),
                 &ctx.parent_cwd,
             );
             for e in &errors {
@@ -999,6 +1027,10 @@ pub(crate) async fn run_shell_child(
         subagent_id: request.id.clone(),
         parent_session_id: request.parent_session_id.clone(),
         subagent_type: request.subagent_type.clone(),
+        owner: telemetry_owner_kind(&request),
+        workflow_run_id: request.owner.workflow_run_id().map(str::to_string),
+        queued_ms: queued_for.map(|queued| u64::try_from(queued.as_millis()).unwrap_or(u64::MAX)),
+        session_running: u32::try_from(session_running).unwrap_or(u32::MAX),
         persona: request.runtime_overrides.persona.clone(),
         fork_context: matches!(context_source, InitialContextSource::Forked),
         resume_from: request.resume_from.clone(),
@@ -1124,6 +1156,8 @@ pub(crate) async fn run_shell_child(
         ctx.goal_enabled,
         ctx.background_workflows_enabled,
         true,
+        ctx.subagents_max_depth,
+        ctx.workflow_max_concurrent_agents,
         ctx.ask_user_question_enabled,
         ctx.client_hooks.clone(),
         None,
@@ -1163,6 +1197,7 @@ pub(crate) async fn run_shell_child(
         } else {
             None
         },
+        false,
     )
     .await;
     let (child_handle, mut permission_rx, _system_prompt, child_thread) = match spawn_result {
@@ -1270,12 +1305,24 @@ pub(crate) async fn run_shell_child(
     });
     let mut wait_outcome =
         await_subagent_turn_or_cancellation(prompt_rx, cancel_token.clone()).await;
-    if is_rate_limited_wait_outcome(&wait_outcome)
+    if (is_rate_limited_wait_outcome(&wait_outcome)
+        || is_structured_output_failure(
+            &wait_outcome,
+            request.runtime_overrides.output_schema.is_some(),
+        ))
         && let Some(fallback_model) = ctx
             .subagent_model_fallbacks
             .get(&request.subagent_type)
             .map(String::as_str)
     {
+        // FT-007: remember the burned primary as soon as we know it failed in a
+        // fallback-worthy way — even if the in-session switch below never
+        // lands, the NEXT spawn of this role should skip the doomed primary.
+        super::sticky_fallback_set(
+            &request.subagent_type,
+            fallback_model,
+            "primary fallback-worthy fail",
+        );
         match resolve_model_override_to_config(fallback_model, &ctx) {
             Some((fallback_sampling_config, fallback_model_id))
                 if fallback_model_id != effective_model_id =>
@@ -1285,7 +1332,9 @@ pub(crate) async fn run_shell_child(
                     subagent_type = %request.subagent_type,
                     primary_model = %effective_model_id.0,
                     fallback_model = %fallback_model_id.0,
-                    "Primary subagent model exhausted its rate-limit retries; switching once to configured fallback"
+                    "Primary subagent model failed with a fallback-worthy error \
+                     (rate limit / unsupported response_format / serialization); \
+                     switching once to configured fallback"
                 );
                 let fallback_threshold =
                     ctx.resolve_auto_compact_threshold_percent(fallback_model_id.0.as_ref());
@@ -1307,6 +1356,14 @@ pub(crate) async fn run_shell_child(
                     false
                 };
                 if switched {
+                    // FT-007: pin the sticky entry to the model we actually
+                    // switched to (canonical id), so the next spawn starts here.
+                    super::sticky_fallback_set(
+                        &request.subagent_type,
+                        fallback_model_id.0.as_ref(),
+                        "one-shot in-session fallback after primary fallback-worthy fail",
+                    );
+                    used_sticky_or_fallback = true;
                     subagent_meta.effective_model_id = Some(fallback_model_id.0.to_string());
                     write_subagent_meta(&subagent_meta_dir, &subagent_meta);
                     gcs_upload_ctx.model_id = Some(fallback_model_id.0.to_string());
@@ -1314,8 +1371,10 @@ pub(crate) async fn run_shell_child(
                     turn_started_at = chrono::Utc::now().to_rfc3339();
                     let (fallback_prompt_tx, fallback_prompt_rx) = oneshot::channel();
                     let retry_prompt = format!(
-                        "The primary model was rate limited before completing this turn. \
-                         Continue the original task now using the existing conversation context. \
+                        "The primary model failed before completing this turn \
+                         (rate limit, unsupported structured-output format, or \
+                         a provider serialization error). Continue the original \
+                         task now using the existing conversation context. \
                          Do not restart completed work.\n\nOriginal task:\n{prompt}",
                     );
                     let _ = child_handle.cmd_tx.send(SessionCommand::Prompt {
@@ -1571,6 +1630,13 @@ pub(crate) async fn run_shell_child(
             }
         }
     };
+    // FT-007 clear policy (anti-loop): only a clean run on the PRIMARY model
+    // clears the sticky entry. A success that only happened because we started
+    // on (or switched to) the fallback keeps the entry alive until its TTL, so
+    // the next spawn of this role does not walk back into the doomed primary.
+    if result.success && !used_sticky_or_fallback {
+        super::sticky_fallback_clear(&request.subagent_type, "spawn succeeded on primary model");
+    }
     if let Some(trace_gcs_config) = gcs_upload_ctx.upload_method.as_ref().map(|method| {
         crate::session::repo_changes::TraceExportConfig {
             bucket_url: gcs_upload_ctx.bucket_url.clone(),
@@ -1843,6 +1909,8 @@ pub(crate) async fn run_shell_child(
     xai_grok_telemetry::session_ctx::log_event(xai_grok_telemetry::events::SubagentCompleted {
         subagent_id: request.id.clone(),
         parent_session_id: request.parent_session_id.clone(),
+        owner: telemetry_owner_kind(&request),
+        workflow_run_id: request.owner.workflow_run_id().map(str::to_string),
         outcome,
         duration_ms: result.duration_ms,
         tool_calls: result.tool_calls,
@@ -1897,7 +1965,9 @@ pub(crate) async fn run_shell_child(
         }
         (None, None) => {}
     }
-    let _ = child_handle.cmd_tx.send(SessionCommand::Shutdown);
+    let _ = child_handle.cmd_tx.send(SessionCommand::Shutdown(
+        crate::session::ShutdownKind::Graceful,
+    ));
     ctx.workspace_ops
         .end_local_session(child_session_id.0.as_ref());
     let mut disposed_snapshot_ref: Option<String> = None;

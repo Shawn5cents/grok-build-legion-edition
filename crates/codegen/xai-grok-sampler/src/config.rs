@@ -111,6 +111,11 @@ pub struct SamplerConfig {
     #[serde(default)]
     pub supports_backend_search: bool,
 
+    /// When false, use the StructuredOutput tool instead of native
+    /// response_format json_schema even on backends that normally support it.
+    #[serde(default = "crate::config::default_true")]
+    pub supports_structured_output: bool,
+
     /// Per-model config for the `x-compactions-remaining` header; `None` disables it.
     #[serde(default)]
     pub compactions_remaining: Option<CompactionsRemaining>,
@@ -131,6 +136,11 @@ pub struct SamplerConfig {
     /// Per-request header injector (e.g. OTel traceparent). Called in `post()`.
     #[serde(skip)]
     pub header_injector: Option<SharedHeaderInjector>,
+}
+
+/// Default function for `supports_structured_output` serde attribute.
+pub(crate) fn default_true() -> bool {
+    true
 }
 
 impl Default for SamplerConfig {
@@ -163,6 +173,7 @@ impl Default for SamplerConfig {
             attribution_callback: None,
             bearer_resolver: None,
             supports_backend_search: false,
+            supports_structured_output: true,
             compactions_remaining: None,
             compaction_at_tokens: None,
             doom_loop_recovery: None,

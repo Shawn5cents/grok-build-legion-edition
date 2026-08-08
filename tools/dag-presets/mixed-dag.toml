@@ -1,0 +1,121 @@
+# =============================================================================
+# DAG label: MIXED  (aliases: diverse, multi-family, ensemble, cross)
+# Use for: daily work with true cross-family verification — different LLM
+#          families for different roles, catching bugs DeepSeek-alone misses.
+# Cost: LOW–MEDIUM  |  Restart TUI required after:  dag mixed
+# =============================================================================
+# Multi-family economy DAG — strongest verification at economy pricing.
+#
+# PRIMARY:
+#   main chat / orchestrator  deepseek-v4-pro     (proven, reliable)
+#   explore                   deepseek-v4-flash   (fastest + cheapest breadth)
+#   plan                      minimax-m3          (different architecture → fresh plans)
+#   architect                 gpt-5.6-luna        (OpenAI ≠ MiniMax → catches design gaps)
+#   implementor               minimax-m3          (strong frontier coder)
+#   verifier                  qwen3-flash         (≠ implementor → REAL verification edge)
+#   general-purpose           deepseek-v4-pro     (safe fallback)
+# FALLBACK:
+#   orchestrator              deepseek-v4-flash
+#   explore / plan / architect / general-purpose   gpt-5.6-luna
+#   implementor               gpt-5.6-luna
+#   verifier                  deepseek-v4-flash   (still ≠ implementor)
+# AUTH: DEEPSEEK_API_KEY + MINIMAX_API_KEY + OPENROUTER_API_KEY.
+#       OPENAI optional for fallbacks.
+# =============================================================================
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "deepseek-v4-pro"
+explore = "deepseek-v4-flash"
+plan = "minimax-m3"
+architect = "gpt-5.6-luna"
+implementor = "minimax-m3"
+verifier = "qwen3-flash"
+general-purpose = "deepseek-v4-pro"
+
+[subagents.fallback]
+orchestrator = "deepseek-v4-flash"
+explore = "gpt-5.6-luna"
+plan = "gpt-5.6-luna"
+architect = "minimax-m3"
+implementor = "gpt-5.6-luna"
+verifier = "deepseek-v4-flash"
+general-purpose = "gpt-5.6-luna"
+[model.deepseek-v4-pro]
+model = "deepseek-v4-pro"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Pro"
+env_key = ["DEEPSEEK_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1000000
+supports_structured_output = false
+[model.deepseek-v4-flash]
+model = "deepseek-v4-flash"
+base_url = "https://api.deepseek.com/v1"
+name = "DeepSeek V4 Flash"
+env_key = ["DEEPSEEK_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1000000
+supports_structured_output = false
+[model."minimax-m3"]
+model = "MiniMax-M3"
+base_url = "https://api.minimax.io/v1"
+name = "MiniMax M3"
+api_backend = "chat_completions"
+env_key = ["MINIMAX_API_KEY"]
+context_window = 1000000
+# MiniMax rejects native json_schema response_format; force the
+# StructuredOutput tool path instead of a provider 400 (FT-008).
+supports_structured_output = false
+
+[model."qwen3-flash"]
+model = "qwen/qwen3.7-flash"
+base_url = "https://openrouter.ai/api/v1"
+name = "Qwen3.7 Flash (via OpenRouter)"
+api_backend = "chat_completions"
+env_key = ["OPENROUTER_API_KEY"]
+context_window = 1000000
+supports_structured_output = false
+
+# Fallbacks only — not used as primaries in mixed mode
+[model."gpt-5.6-luna"]
+model = "gpt-5.6-luna"
+base_url = "https://api.openai.com/v1"
+name = "GPT-5.6 Luna (fallback)"
+api_backend = "responses"
+env_key = ["OPENAI_API_KEY"]
+context_window = 1000000
+
+[marketplace]
+default_skills_installs_purged = true
+official_marketplace_auto_installed = true
+
+[[marketplace.sources]]
+name = "xAI Official"
+git = "https://github.com/xai-org/plugin-marketplace.git"
+
+[cli]
+installer = "internal"
+
+[ui]
+max_thoughts_width = 120
+fork_secondary_model = "deepseek-v4-flash"
+yolo = false
+compact_mode = false
+permission_mode = "always-approve"
+
+[features]
+remote_fetch = false
+
+# Goal DAG role → model routing (planner/strategist/verifier skeptics)
+# Each role spawns as general-purpose with a harness override;
+# the model field routes to the DAG-assigned provider.
+[goal]
+planner_model = { model = "minimax-m3", agent_type = "general-purpose" }
+strategist_model = { model = "gpt-5.6-luna", agent_type = "general-purpose" }
+skeptic_models = [{ model = "deepseek-v4-flash", agent_type = "general-purpose" }]
+
+[models]
+default = "deepseek-v4-pro"
