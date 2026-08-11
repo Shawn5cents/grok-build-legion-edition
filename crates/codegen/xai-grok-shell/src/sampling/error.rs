@@ -136,8 +136,8 @@ pub fn map_sampling_err_to_acp(err: SamplingError) -> acp::Error {
             StatusCode::BAD_REQUEST => acp::Error::invalid_params().data(message),
             StatusCode::NOT_FOUND => acp::Error::resource_not_found(None).data(message),
             StatusCode::PAYLOAD_TOO_LARGE => acp::Error::invalid_params().data(message),
-            StatusCode::TOO_MANY_REQUESTS => {
-                acp::Error::new(RATE_LIMITED_ERROR_CODE, "Rate limited".to_string()).data(message)
+            StatusCode::TOO_MANY_REQUESTS | StatusCode::PAYMENT_REQUIRED => {
+                acp::Error::new(RATE_LIMITED_ERROR_CODE, "Rate limited or credit exhausted".to_string()).data(message)
             }
             // Preserve the HTTP status in data so the classifier folds capacity
             // errors (503/529) into `rate_limit`.

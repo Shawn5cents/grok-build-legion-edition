@@ -173,7 +173,7 @@ impl SamplingError {
         matches!(
             self,
             SamplingError::Api {
-                status: StatusCode::TOO_MANY_REQUESTS,
+                status: StatusCode::TOO_MANY_REQUESTS | StatusCode::PAYMENT_REQUIRED,
                 ..
             }
         )
@@ -244,7 +244,7 @@ impl SamplingError {
             SamplingError::Http(err) => is_retryable_reqwest(err),
             SamplingError::Serialization(_) => false,
             SamplingError::Api { status, .. } => {
-                matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504 | 520)
+                matches!(status.as_u16(), 402 | 429 | 500 | 502 | 503 | 504 | 520)
             }
             SamplingError::EventStreamError(_) => true,
             SamplingError::StreamError { .. } => true,

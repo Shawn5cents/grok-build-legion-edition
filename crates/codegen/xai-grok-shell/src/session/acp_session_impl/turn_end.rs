@@ -376,7 +376,7 @@ impl SessionActor {
         // (no status, so `-32603` below).
         match crate::sampling::error::http_status_from_error(err) {
             Some(401) => return K::AuthenticationFailed,
-            Some(429) | Some(503) | Some(529) => return K::RateLimit,
+            Some(402) | Some(429) | Some(503) | Some(529) => return K::RateLimit,
             Some(s) if (400..500).contains(&s) => return K::InvalidRequest,
             Some(s) if s >= 500 => return K::ServerError,
             _ => {}
