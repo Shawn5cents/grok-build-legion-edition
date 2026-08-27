@@ -47,6 +47,11 @@ for preset in "$PROJECT_DIR"/presets/*.toml; do
     install -m 0600 "$preset" "$PRESETS_DIR/$(basename -- "$preset")"
 done
 
+# /dag skill — install the corrected DAG preset switcher skill.
+SKILL_DIR="$GROK_CONFIG_HOME/skills/dag"
+mkdir -p -- "$SKILL_DIR"
+install -m 0644 "$PROJECT_DIR/skills/dag/SKILL.md" "$SKILL_DIR/SKILL.md"
+
 ln -sfn "legion" "$INSTALL_BIN_DIR/grok"
 # The updater atomically replaces these managed entry points with binaries from
 # Legion GitHub releases. Seed all of them with the freshly built local binary
@@ -78,6 +83,7 @@ echo "   • Control hub:   legion hub"
 echo "   • Presets:       legion mode"
 echo "   • Role editor:   legion config"
 echo "   • Re-discover:   legion discover"
+echo "   • /dag skill:    $SKILL_DIR/SKILL.md"
 if [[ ":$PATH:" != *":$INSTALL_BIN_DIR:"* ]]; then
     echo
     echo "Add $INSTALL_BIN_DIR to PATH before using these commands."
