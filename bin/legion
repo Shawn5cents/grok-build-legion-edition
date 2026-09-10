@@ -29,6 +29,12 @@ resolve_tools_dir() {
 TOOLS_DIR="$(resolve_tools_dir || true)"
 SKIP_DISCOVERY=0
 
+# Load provider API keys from Legion's private credential store for every run.
+CRED_LOADER="$GROK_CONFIG_HOME/tools/load_credentials.py"
+if [ -f "$CRED_LOADER" ]; then
+    eval "$(python3 "$CRED_LOADER")"
+fi
+
 usage() {
     cat <<'EOF'
 Usage: legion [CONTROL COMMAND] [ARGS...]

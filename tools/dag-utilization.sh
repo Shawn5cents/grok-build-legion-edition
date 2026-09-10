@@ -146,8 +146,16 @@ case "$DAG_LABEL" in
     full|max|flagship|best)    PRESET_FILE="$PRESETS_DIR/full-dag.toml" ;;
     economy|cheap|daily|cost)  PRESET_FILE="$PRESETS_DIR/economy-dag.toml" ;;
     mixed|diverse|multi-family|ensemble|cross) PRESET_FILE="$PRESETS_DIR/mixed-dag.toml" ;;
-    *)                         PRESET_FILE="$PRESETS_DIR/full-dag.toml"
-                               DAG_LABEL="full (fallback)" ;;
+    *)
+        if [[ -f "$PRESETS_DIR/${DAG_LABEL}.toml" ]]; then
+            PRESET_FILE="$PRESETS_DIR/${DAG_LABEL}.toml"
+        elif [[ -f "$PRESETS_DIR/${DAG_LABEL}-dag.toml" ]]; then
+            PRESET_FILE="$PRESETS_DIR/${DAG_LABEL}-dag.toml"
+        else
+            PRESET_FILE="$PRESETS_DIR/full-dag.toml"
+            DAG_LABEL="full (fallback)"
+        fi
+        ;;
 esac
 
 if [[ ! -f "$PRESET_FILE" ]]; then

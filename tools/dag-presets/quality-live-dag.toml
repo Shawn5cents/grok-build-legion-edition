@@ -1,0 +1,60 @@
+# QUALITY-LIVE DAG — strongest models verified callable on 2026-09-09.
+# OpenAI/Anthropic direct credentials and xAI are intentionally not used here;
+# GPT-6 Astra Pro and Claude Opus 5 route through the working OpenRouter account.
+
+[preset]
+name = "Quality Live DAG"
+required_env = ["OPENROUTER_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
+
+[subagents]
+enabled = true
+
+[subagents.models]
+orchestrator = "or-gpt-6-astra-pro"
+explore = "gemini-3.8-flash"
+architect = "or-claude-opus-5"
+implementor = "or-deepseek-v4-pro"
+verifier = "or-gpt-6-astra-pro"
+plan = "or-claude-opus-5"
+general-purpose = "or-deepseek-v4-pro"
+
+[subagents.fallback]
+orchestrator = "or-claude-opus-5"
+explore = "deepseek-v4-flash"
+architect = "or-gpt-6-astra-pro"
+implementor = "or-gpt-6-astra-pro"
+verifier = "or-claude-opus-5"
+plan = "or-gpt-6-astra-pro"
+general-purpose = "gemini-3.8-flash"
+
+[model."or-gpt-6-astra-pro"]
+model = "openai/gpt-6-astra-pro"
+base_url = "https://openrouter.ai/api/v1"
+name = "GPT-6 Astra Pro via OpenRouter"
+env_key = ["OPENROUTER_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1050000
+
+[model."or-claude-opus-5"]
+model = "anthropic/claude-opus-5"
+base_url = "https://openrouter.ai/api/v1"
+name = "Claude Opus 5 via OpenRouter"
+env_key = ["OPENROUTER_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1000000
+
+[model."gemini-3.8-flash"]
+model = "gemini-3.8-flash"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+name = "Gemini 3.8 Flash"
+env_key = ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1048576
+
+[model."or-deepseek-v4-pro"]
+model = "deepseek/deepseek-v4-pro"
+base_url = "https://openrouter.ai/api/v1"
+name = "DeepSeek V4 Pro via OpenRouter"
+env_key = ["OPENROUTER_API_KEY"]
+api_backend = "chat_completions"
+context_window = 1048576

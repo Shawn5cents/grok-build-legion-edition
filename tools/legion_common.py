@@ -10,7 +10,10 @@ import os
 import re
 import sys
 import tempfile
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -409,6 +412,13 @@ def _switch_command(args: argparse.Namespace) -> int:
     try:
         preset_data = load_toml(preset_path)
         models = apply_preset(preset_path)
+        # Keep runtime/health tooling aligned with custom Legion mode switches.
+        atomic_write(grok_home() / "dag-mode", args.preset + "\n", private=False)
+        atomic_write(
+            grok_home() / "dag-mode-switched-at",
+            args.preset + "\n" + __import__("datetime").datetime.now(__import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") + "\n",
+            private=False,
+        )
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
